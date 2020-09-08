@@ -19,6 +19,5 @@ export class RootComponent extends Component {
 		counterService.add();
 		counterService.subscribe(evt => console.log(evt.detail));
 		this.namer = "cool";
-		console.log(this.namer);
 	}
 }
