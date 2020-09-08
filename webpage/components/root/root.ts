@@ -8,6 +8,7 @@ export class RootComponent extends Component {
 	static META = import.meta;
 
 	private value = 20;
+	private backStyle = "";
 
 	set setter(val: string) {
 		console.log("setter", val);
@@ -21,8 +22,12 @@ export class RootComponent extends Component {
 		super();
 		const counterService = framework.service(CounterService);
 		counterService.add();
-		counterService.subscribe(evt => console.log(evt.detail));
+		counterService.subscribe(evt => {});
 		this.setter = "cool";
+
+		setTimeout(() => {
+			this.backStyle = "background-color: blue";
+		}, 1000);
 	}
 
 	addToGetter() {

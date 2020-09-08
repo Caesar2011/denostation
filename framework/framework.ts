@@ -7,7 +7,7 @@ export class Framework {
 
 	constructor() {
 		window.addEventListener('DOMContentLoaded', () => {
-			console.log("loaded");
+			console.log("DOM loaded");
 			this.setupNodes(document);
 		}, false);
 	}

@@ -106,7 +106,6 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 		}
 
 		update(p: string, value: any): void {
-			console.log("update");
 			walkTheDOM(this.root, (node: Node) => {
 				(node as UpgradedNode).update(this.data);
 			});

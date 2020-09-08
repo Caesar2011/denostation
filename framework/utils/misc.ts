@@ -13,6 +13,5 @@ export function walkTheDOM(node: Node, func: (node: Node) => void){
 
 export function betterEval(code: string): any {
 	const data = `"use strict";return (${code})`;
-	console.log(data);
 	return Function(data)();
 }

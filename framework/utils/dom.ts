@@ -15,12 +15,10 @@ function upgradeText(node: UpgradedText) {
 
 function upgradeHTMLElement(node: UpgradedHTMLElement) {
   const args: {[_: string]: ParseFunc} = {};
-  console.log(node, node.attributes);
   for (let idx in node.attributes) {
     if (!node.attributes.hasOwnProperty(idx)) continue;
     const name = node.attributes[idx].nodeName;
     const value = node.attributes[idx].nodeValue ?? "";
-    console.log("ATTR", node, name, value);
     if (name.startsWith("[")) {
       args[name] = evaluate(value);
     } else if (name.startsWith("(")) {
@@ -37,21 +35,6 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
 }
 
 export function upgradeNode(node: Node) {
-  /*for (const method of properties.methods) {
-    (node as any)[method] = data[method];
-  }
-  for (const getter of properties.getter) {
-    Object.defineProperty(node, getter, {
-      configurable: properties.setter.includes(getter),
-      get(): any { return data[getter]; }
-    });
-  }
-  for (const setter of properties.setter) {
-    Object.defineProperty(node, setter, {
-      configurable: false,
-      set(v: any) { data[setter] = v; }
-    });
-  }*/
   if (node instanceof Text) {
     upgradeText(node as UpgradedText);
   } else if (node instanceof HTMLElement) {
@@ -83,9 +66,11 @@ function interpolate(text: string): ParseFunc<string> {
 
   return (data) => {
     return collect
-      .map(func => func(data).toString())
+      .map(func => {
+        return (func(data) ?? "").toString();
+      })
       .join("");
-  }
+  };
 }
 
 function evaluate(evalText: string): ParseFunc {
