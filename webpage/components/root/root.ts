@@ -9,8 +9,12 @@ export class RootComponent extends Component {
 
 	private value = 20;
 
-	set namer(val: string) {
+	set setter(val: string) {
 		console.log("setter", val);
+	}
+
+	get getter(): number {
+		return this.value;
 	}
 
 	constructor() {
@@ -18,6 +22,10 @@ export class RootComponent extends Component {
 		const counterService = framework.service(CounterService);
 		counterService.add();
 		counterService.subscribe(evt => console.log(evt.detail));
-		this.namer = "cool";
+		this.setter = "cool";
+	}
+
+	addToGetter() {
+		this.value++;
 	}
 }

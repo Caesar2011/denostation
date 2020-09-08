@@ -1,6 +1,7 @@
 import {resolve} from './utils/path.ts';
-import {framework, Instantiable} from './mod.ts';
+import {framework, Instantiable, walkTheDOM} from './mod.ts';
 import getPrototypeOf = Reflect.getPrototypeOf;
+import {ComponentProperties, UpgradedNode, upgradeNode} from "./utils/dom.ts";
 
 type BaseComponentClass = Instantiable<BaseComponent>;
 export type ComponentClass = BaseComponentClass & {
@@ -34,8 +35,8 @@ class BaseComponent {
 	}
 }
 
-const PROTECTED_PROPERTIES: (string|number|symbol)[] = ["root"];
-const PROTECTED_METHODS: string[] = ["constructor", "onInit"];
+const PROTECTED_PROPERTIES: (string|number|symbol)[] = ["root", "updates"];
+const PROTECTED_METHODS: string[] = ["constructor", "onInit", "onUpdate"];
 
 const handler: ProxyHandler<BaseComponent> = {
 	set(target: BaseComponent, p: PropertyKey, value: any, receiver: any): boolean {
@@ -71,54 +72,93 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 	return class extends HTMLElement implements HTMLDataElement<BaseComponent> {
 
 		data: BaseComponent;
+		private readonly root: ShadowRoot;
 
 		constructor() {
 			super();
+
+			new MutationObserver(mutations => this.onMutation(mutations)).observe(this, {attributes: true, attributeOldValue: true});
+
+			this.root = this.attachShadow({mode: 'closed'});
 			this.data = new base();
 			this.setup().then(() => {});
 		}
 
 		private async setup() {
-			const root = this.attachShadow({mode: 'closed'});
-
 			const baseUrl = (base.META as { url: string }).url;
 			const htmlPath = resolve(baseUrl, "../", base.HTML);
 			const res = await fetch(htmlPath);
-			root.innerHTML = await res.text();
+			this.root.innerHTML = await res.text();
 
 			if (base.CSS) {
 				const cssPath = resolve(baseUrl, "../", base.CSS);
 				const link = document.createElement('link');
 				link.setAttribute('rel', 'stylesheet');
 				link.setAttribute('href', cssPath);
-				root.appendChild(link);
+				this.root.appendChild(link);
 			}
 			this.dispatchEvent(new CustomEvent('custom', {detail: 4}));
 
-			this.getProperties();
-
-			framework.setupNodes(root, node => {
-				console.log("child", node);
+			framework.setupNodes(this.root, node => {
+				upgradeNode(node);
 			});
-			this.data.onInit(root);
-			console.log("who is root?", this.getRootNode());
+			this.data.onInit(this.root);
 		}
 
 		update(p: string, value: any): void {
-			console.log("update", p, value);
+			console.log("update");
+			walkTheDOM(this.root, (node: Node) => {
+				(node as UpgradedNode).update(this.data);
+			});
 		}
 
-		getProperties() {
-			console.log(1, Object.keys(this.data));
-			console.log(2, Object.getOwnPropertyNames(this.data));
-			console.log(3, Object.getOwnPropertySymbols(this.data));
-			console.log(4, Object.getOwnPropertyNames(this.data)
-				.filter(
-					e => typeof (this.data as any)[e] === 'function'
-				)
-			);
+		onMutation(mutations: MutationRecord[]) {
+			const attributeChanges: {[key: string]: [any, any]} = {};
+			let found = false;
+			for (const mutation of mutations) {
+				if (mutation.type === "attributes") {
+					const attributeName = mutation.attributeName ?? "null";
+					const value = this.getAttribute(attributeName);
+					if (mutation.oldValue !== value) {
+						attributeChanges[attributeName] = [mutation.oldValue, value];
+						found = true;
+					}
+				}
+			}
+			if (found)
+				this.attributeChanges(attributeChanges);
+		}
 
-			console.log(5, Object.getOwnPropertyNames(getPrototypeOf(this.data)));
+		attributeChanges(mutation: {[key: string]: [any, any]}) {
+			console.log("MUTATION", mutation);
+		}
+
+		getProperties(): ComponentProperties {
+			const prototype = getPrototypeOf(this.data);
+			const properties = Object
+				.getOwnPropertyNames(this.data)
+				.filter((elem => !PROTECTED_PROPERTIES.includes(elem)));
+			const allMethods = Object
+				.getOwnPropertyNames(prototype)
+				.filter((elem => !PROTECTED_METHODS.includes(elem)));
+			const methods = [];
+			const getter = [...properties];
+			const setter = [...properties];
+			for (const method of allMethods) {
+				if (typeof (this.data as any)[method] === 'function') {
+					methods.push(method);
+				} else {
+					const descriptor = Object.getOwnPropertyDescriptor(prototype, method) ?? {};
+					if (descriptor.get) {
+						getter.push(method);
+					}
+					if (descriptor.set) {
+						setter.push(method);
+					}
+				}
+			}
+
+			return { methods, getter, setter };
 		}
 	}
 }
