@@ -45,7 +45,7 @@ export class BaseComponent {
 }
 
 const PROTECTED_PROPERTIES: (string|number|symbol)[] = ["root"];
-const PROTECTED_METHODS: string[] = ["constructor", "onInit", "onUpdate", "onAttributesChanged"];
+const PROTECTED_METHODS: string[] = ["constructor", "onInit", "onUpdate", "onAttributesChanged", "onInputChanged"];
 
 const handler: ProxyHandler<BaseComponent> = {
 	set(target: BaseComponent, p: PropertyKey, value: any, receiver: any): boolean {
@@ -55,7 +55,7 @@ const handler: ProxyHandler<BaseComponent> = {
 			if (PROTECTED_PROPERTIES.includes(p)) {
 				Object.defineProperty(target, p, { configurable: false, writable: false });
 			} else if (beforeValue !== value) {
-				console.log(`update >${p.toString()}< to value >${value}< on target:`, target, 'receiver:', receiver);
+				//console.log(`update >${p.toString()}< to value >${value}< on target:`, target, 'receiver:', receiver);
 				target.onUpdate(p, value, beforeValue);
 			}
 		}
@@ -72,7 +72,7 @@ const constructHandler: ProxyHandler<BaseComponentClass> = {
 
 export const Component: BaseComponentClass = new Proxy(BaseComponent, constructHandler);
 
-export interface HTMLDataElement<T extends BaseComponent> extends HTMLElement {
+export interface HTMLDataElement<T extends BaseComponent = BaseComponent> extends HTMLElement {
 	data: T;
 	updateDOM(): void;
 	fireOutput(p: string, value: any): void;
@@ -82,7 +82,7 @@ export interface HTMLDataElement<T extends BaseComponent> extends HTMLElement {
 }
 
 export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement> {
-	return class extends HTMLElement implements HTMLDataElement<BaseComponent> {
+	return class extends HTMLElement implements HTMLDataElement {
 
 		data: BaseComponent;
 		private properties: ComponentProperties;

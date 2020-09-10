@@ -7,21 +7,19 @@ export class RootComponent extends Component {
 	static CSS = 'root.css';
 	static META = import.meta;
 
-	private backStyle = "";
-	private counterValue: number|undefined = 20;
+	private form = {
+		day: 20,
+		month: 6
+	};
 
 	constructor() {
 		super();
 		const counterService = framework.service(CounterService);
 		counterService.add();
 		counterService.subscribe(evt => {});
-
-		setTimeout(() => {
-			this.backStyle = "border: 1px solid red;";
-		}, 1000);
 	}
 
-	resetCounter() {
-		this.counterValue = 20;
+	alert() {
+		alert(this.form.day + " - " + this.form.month);
 	}
 }

@@ -9,7 +9,6 @@ export class Framework {
 	constructor() {
 		//upgradeEventTargetPrototype();
 		window.addEventListener('DOMContentLoaded', () => {
-			console.log("DOM loaded");
 			this.setupNodes(document);
 		}, false);
 	}

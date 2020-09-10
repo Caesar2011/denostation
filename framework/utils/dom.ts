@@ -52,7 +52,7 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
       inputHtmlArgs[name] = interpolate(value);
     }
   }
-  (node as any as UpgradedHTMLElement & HTMLDataElement<any>).updateAttributes = function (data) {
+  (node as any as UpgradedHTMLElement & HTMLDataElement).updateAttributes = function (data) {
     for (const key in inputHtmlArgs) {
       this.setAttribute(key, inputHtmlArgs[key](data));
     }
@@ -69,7 +69,10 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
         }
       }
       for (const key in outputArgs) {
-        this.collectOutputChange(key, outputArgs[key](data));
+        this.collectOutputChange(key, (evt) => {
+          outputArgs[key](data)(evt);
+          ((this.getRootNode() as ShadowRoot).host as HTMLDataElement).updateDOM();
+        });
       }
       this.notifyInputChanged();
     }
