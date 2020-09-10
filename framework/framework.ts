@@ -1,13 +1,11 @@
 import {Service, walkTheDOM} from './mod.ts';
 import {ComponentClass, ComponentWrapper} from './component.ts';
-//import {upgradeEventTargetPrototype} from "./utils/misc.ts";
 
 export class Framework {
 
 	private services = new Map<Service<any>, any>();
 
 	constructor() {
-		//upgradeEventTargetPrototype();
 		window.addEventListener('DOMContentLoaded', () => {
 			console.log("DOM loaded");
 			this.setupNodes(document);
