@@ -6,7 +6,7 @@ export class CounterComponent extends Component {
 	static META = import.meta;
 	static INPUTS = ["start"];
 
-	private value = 20;
+	private value = 10;
 
 	set start(val: number) {
 		this.value = val;
@@ -14,5 +14,17 @@ export class CounterComponent extends Component {
 
 	constructor() {
 		super();
+	}
+
+	down() {
+		this.value--;
+	}
+
+	up() {
+		this.value++;
+	}
+
+	onInputChanged(attributeChanges: { [p: string]: [any, any] }) {
+		super.onInputChanged(attributeChanges);
 	}
 }
