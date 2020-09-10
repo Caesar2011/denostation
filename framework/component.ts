@@ -2,6 +2,8 @@ import {resolve} from './utils/path.ts';
 import {framework, Instantiable, walkTheDOM} from './mod.ts';
 import {ComponentProperties, UpgradedNode, upgradeNode} from "./utils/dom.ts";
 
+const symUpdatesBeforeInit = Symbol("updatesBeforeInit");
+
 type BaseComponentClass = Instantiable<BaseComponent>;
 export type ComponentClass = BaseComponentClass & {
 	NAME: string,
@@ -14,16 +16,24 @@ export type ComponentClass = BaseComponentClass & {
 
 export class BaseComponent {
 	root = (undefined as any as ShadowRoot & {host: HTMLDataElement<any>});
+	private [symUpdatesBeforeInit]: {[_: string]: any} = {};
 
 	onInit(root: ShadowRoot) {
 		this.root = root as ShadowRoot & {host: HTMLDataElement<any>};
-		this.root.host.update();
+		this.root.host.updateDOM();
+		for (const p in this[symUpdatesBeforeInit]) {
+			if (this[symUpdatesBeforeInit].hasOwnProperty(p))
+				this.root.host.fireOutput(p, this[symUpdatesBeforeInit][p]);
+		}
 	}
 
 	onUpdate(p: PropertyKey, value: any, beforeValue: any) {
 		if (typeof p !== "string") return;
 		if (this.root) {
-			this.root.host.update();
+			this.root.host.updateDOM();
+			this.root.host.fireOutput(p, value);
+		} else {
+		this[symUpdatesBeforeInit][p] = value;
 		}
 	}
 
@@ -34,7 +44,7 @@ export class BaseComponent {
 	}
 }
 
-const PROTECTED_PROPERTIES: (string|number|symbol)[] = ["root", "updates"];
+const PROTECTED_PROPERTIES: (string|number|symbol)[] = ["root"];
 const PROTECTED_METHODS: string[] = ["constructor", "onInit", "onUpdate", "onAttributesChanged"];
 
 const handler: ProxyHandler<BaseComponent> = {
@@ -64,8 +74,10 @@ export const Component: BaseComponentClass = new Proxy(BaseComponent, constructH
 
 export interface HTMLDataElement<T extends BaseComponent> extends HTMLElement {
 	data: T;
-	update(): void;
+	updateDOM(): void;
+	fireOutput(p: string, value: any): void;
 	collectInputChange(key: string, value: any): void;
+	collectOutputChange(key: string, value: (evt: any) => void): void;
 	notifyInputChanged(): void;
 }
 
@@ -76,6 +88,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 		private properties: ComponentProperties;
 		private readonly root: ShadowRoot;
 		private inputChanges: {[key: string]: [any, any]} = {};
+		private outputs: {[key: string]: (evt: any) => void} = {};
 
 		constructor() {
 			super();
@@ -110,10 +123,15 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			this.data.onInit(this.root);
 		}
 
-		update(): void {
+		updateDOM(): void {
 			walkTheDOM(this.root, (node: Node) => {
 				(node as UpgradedNode).updateAttributes(this.data);
 			});
+		}
+
+		fireOutput(p: string, value: any): void {
+			if (this.outputs.hasOwnProperty(p))
+				this.outputs[p](value);
 		}
 
 		onMutation(mutations: MutationRecord[]) {
@@ -134,9 +152,23 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 		}
 
 		collectInputChange(key: string, value: any): void {
+			if (!(base.INPUTS ?? []).includes(key)) {
+				console.error(`The component '${base.NAME}' does not export '${key}' as input.`);
+				return;
+			}
 			if (this.properties.setter.includes(key) && (this.data as any)[key] !== value) {
 				(this.data as any)[key] = value;
 				this.inputChanges[key] = value;
+			}
+		}
+
+		collectOutputChange(key: string, value: (evt: any) => void): void {
+			if (!(base.OUTPUTS ?? []).includes(key)) {
+				console.error(`The component '${base.NAME}' does not export '${key}' as output.`);
+				return;
+			}
+			if (this.properties.setter.includes(key)) {
+				this.outputs[key] = value;
 			}
 		}
 

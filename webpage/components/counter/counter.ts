@@ -4,13 +4,10 @@ export class CounterComponent extends Component {
 	static NAME = "app-counter";
 	static HTML = 'counter.html';
 	static META = import.meta;
-	static INPUTS = ["start"];
+	static INPUTS = ["value"];
+	static OUTPUTS = ["value"];
 
-	private value = 10;
-
-	set start(val: number) {
-		this.value = val;
-	}
+	value = 10;
 
 	constructor() {
 		super();

@@ -7,30 +7,21 @@ export class RootComponent extends Component {
 	static CSS = 'root.css';
 	static META = import.meta;
 
-	private valueRoot = 20;
 	private backStyle = "";
-
-	set setter(val: string) {
-		console.log("setter", val);
-	}
-
-	get getter(): number {
-		return this.valueRoot;
-	}
+	private counterValue: number|undefined = 20;
 
 	constructor() {
 		super();
 		const counterService = framework.service(CounterService);
 		counterService.add();
 		counterService.subscribe(evt => {});
-		this.setter = "cool";
 
 		setTimeout(() => {
-			this.backStyle = "background-color: blue";
+			this.backStyle = "border: 1px solid red;";
 		}, 1000);
 	}
 
-	addToGetter() {
-		this.valueRoot++;
+	resetCounter() {
+		this.counterValue = 20;
 	}
 }
