@@ -1,6 +1,5 @@
 import {resolve} from './utils/path.ts';
 import {framework, Instantiable, walkTheDOM} from './mod.ts';
-import getPrototypeOf = Reflect.getPrototypeOf;
 import {ComponentProperties, UpgradedNode, upgradeNode} from "./utils/dom.ts";
 
 type BaseComponentClass = Instantiable<BaseComponent>;
@@ -13,30 +12,30 @@ export type ComponentClass = BaseComponentClass & {
 	OUTPUTS?: string[]
 };
 
-class BaseComponent {
+export class BaseComponent {
 	root = (undefined as any as ShadowRoot & {host: HTMLDataElement<any>});
-	private updates: [string, any][] = [];
 
 	onInit(root: ShadowRoot) {
 		this.root = root as ShadowRoot & {host: HTMLDataElement<any>};
-		let update: [string, any]|undefined;
-		while (update = this.updates.pop()) {
-			this.root.host.update(...update);
-		}
+		this.root.host.update();
 	}
 
 	onUpdate(p: PropertyKey, value: any, beforeValue: any) {
 		if (typeof p !== "string") return;
-		if (!this.root) {
-			this.updates.push([p, value]);
-		} else {
-			this.root.host.update(p, value);
+		if (this.root) {
+			this.root.host.update();
 		}
+	}
+
+	onAttributesChanged(attributeChanges: {[key: string]: [any, any]}): void {
+	}
+
+	onInputChanged(attributeChanges: {[key: string]: [any, any]}): void {
 	}
 }
 
 const PROTECTED_PROPERTIES: (string|number|symbol)[] = ["root", "updates"];
-const PROTECTED_METHODS: string[] = ["constructor", "onInit", "onUpdate"];
+const PROTECTED_METHODS: string[] = ["constructor", "onInit", "onUpdate", "onAttributesChanged"];
 
 const handler: ProxyHandler<BaseComponent> = {
 	set(target: BaseComponent, p: PropertyKey, value: any, receiver: any): boolean {
@@ -45,7 +44,7 @@ const handler: ProxyHandler<BaseComponent> = {
 		if (success) {
 			if (PROTECTED_PROPERTIES.includes(p)) {
 				Object.defineProperty(target, p, { configurable: false, writable: false });
-			} else {
+			} else if (beforeValue !== value) {
 				console.log(`update >${p.toString()}< to value >${value}< on target:`, target, 'receiver:', receiver);
 				target.onUpdate(p, value, beforeValue);
 			}
@@ -65,22 +64,28 @@ export const Component: BaseComponentClass = new Proxy(BaseComponent, constructH
 
 export interface HTMLDataElement<T extends BaseComponent> extends HTMLElement {
 	data: T;
-	update(p: string, value: any): void;
+	update(): void;
+	collectInputChange(key: string, value: any): void;
+	notifyInputChanged(): void;
 }
 
 export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement> {
 	return class extends HTMLElement implements HTMLDataElement<BaseComponent> {
 
 		data: BaseComponent;
+		private properties: ComponentProperties;
 		private readonly root: ShadowRoot;
+		private inputChanges: {[key: string]: [any, any]} = {};
 
 		constructor() {
 			super();
 
-			new MutationObserver(mutations => this.onMutation(mutations)).observe(this, {attributes: true, attributeOldValue: true});
+			new MutationObserver(mutations => this.onMutation(mutations))
+				.observe(this, {attributes: true, attributeOldValue: true});
 
 			this.root = this.attachShadow({mode: 'closed'});
 			this.data = new base();
+			this.properties = this.getProperties();
 			this.setup().then(() => {});
 		}
 
@@ -105,9 +110,9 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			this.data.onInit(this.root);
 		}
 
-		update(p: string, value: any): void {
+		update(): void {
 			walkTheDOM(this.root, (node: Node) => {
-				(node as UpgradedNode).update(this.data);
+				(node as UpgradedNode).updateAttributes(this.data);
 			});
 		}
 
@@ -125,15 +130,25 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 				}
 			}
 			if (found)
-				this.attributeChanges(attributeChanges);
+				this.data.onAttributesChanged(attributeChanges);
 		}
 
-		attributeChanges(mutation: {[key: string]: [any, any]}) {
-			console.log("MUTATION", mutation);
+		collectInputChange(key: string, value: any): void {
+			if (this.properties.setter.includes(key) && (this.data as any)[key] !== value) {
+				(this.data as any)[key] = value;
+				this.inputChanges[key] = value;
+			}
+		}
+
+		notifyInputChanged(): void {
+			if (Object.keys(this.inputChanges).length > 0) {
+				this.data.onInputChanged(this.inputChanges);
+				this.inputChanges = {};
+			}
 		}
 
 		getProperties(): ComponentProperties {
-			const prototype = getPrototypeOf(this.data);
+			const prototype = Reflect.getPrototypeOf(this.data);
 			const properties = Object
 				.getOwnPropertyNames(this.data)
 				.filter((elem => !PROTECTED_PROPERTIES.includes(elem)));

@@ -1,35 +1,55 @@
 import {betterEval} from "./misc.ts";
+import {BaseComponent, HTMLDataElement} from "../component.ts";
 
 type ParseFunc<T = any> = (data: any) => T;
-export type UpgradedNode = Node & { update(data: any): void };
-type UpgradedText = Text & { update(data: any): void };
-type UpgradedHTMLElement = HTMLElement & { update(data: any): void };
+export type UpgradedNode = Node & { updateAttributes(data: any): void };
+type UpgradedText = Text & { updateAttributes(data: any): void };
+type UpgradedHTMLElement = HTMLElement & { updateAttributes(data: any): void };
 export type ComponentProperties = {methods: string[], getter: string[], setter: string[]};
 
 function upgradeText(node: UpgradedText) {
   const interpolateText = interpolate(node.wholeText);
-  node.update = function(data) {
+  node.updateAttributes = function(data) {
     this.data = interpolateText(data);
   }
 }
 
 function upgradeHTMLElement(node: UpgradedHTMLElement) {
-  const args: {[_: string]: ParseFunc} = {};
+  const inputHtmlArgs: {[_: string]: ParseFunc} = {};
+  const inputArgs: {[_: string]: ParseFunc} = {};
+  const outputHtmlArgs: {[_: string]: ParseFunc} = {};
+  const outputArgs: {[_: string]: ParseFunc} = {};
+  const hasComponent: boolean = node.hasOwnProperty("data") && (node as any).data instanceof BaseComponent;
   for (let idx in node.attributes) {
     if (!node.attributes.hasOwnProperty(idx)) continue;
-    const name = node.attributes[idx].nodeName;
+    let name = node.attributes[idx].nodeName;
     const value = node.attributes[idx].nodeValue ?? "";
-    if (name.startsWith("[")) {
-      args[name] = evaluate(value);
-    } else if (name.startsWith("(")) {
-      // output
-    } else {
-      args[name] = interpolate(value);
+    if (name.startsWith("[")) { // input
+      if (hasComponent) {
+        name = name.substring(1, name.length-1);
+        inputArgs[name] = evaluate(value);
+      }
+    } else if (name.startsWith("(")) { // output
+      name = name.substring(1, name.length-1);
+      outputArgs[name] = evaluate(value, true);
+    } else if (name.startsWith("on")) { // html element events
+      outputHtmlArgs[name] = evaluate(value, true);
+    } else { // html element attributes
+      inputHtmlArgs[name] = interpolate(value);
     }
   }
-  node.update = function (data) {
-    for (const key in args) {
-      this.setAttribute(key, args[key](data));
+  (node as any as UpgradedHTMLElement & HTMLDataElement<any>).updateAttributes = function (data) {
+    for (const key in inputHtmlArgs) {
+      this.setAttribute(key, inputHtmlArgs[key](data));
+    }
+    for (const key in outputHtmlArgs) {
+      (this as any)[key] = outputHtmlArgs[key](data);
+    }
+    if (hasComponent) {
+      for (const key in inputArgs) {
+        this.collectInputChange(key, inputArgs[key](data));
+      }
+      this.notifyInputChanged();
     }
   }
 }
@@ -40,7 +60,7 @@ export function upgradeNode(node: Node) {
   } else if (node instanceof HTMLElement) {
     upgradeHTMLElement(node as UpgradedHTMLElement);
   } else {
-    (node as UpgradedNode).update = function(data) {}
+    (node as UpgradedNode).updateAttributes = function(data) {}
   }
 }
 
@@ -73,11 +93,14 @@ function interpolate(text: string): ParseFunc<string> {
   };
 }
 
-function evaluate(evalText: string): ParseFunc {
+function evaluate(evalText: string, isOutput: boolean = false): ParseFunc {
   evalText = evalText.replace(/^([a-z])|[^.\sa-z]\s*([a-z])/gi, (a) => {
     const pos = a.length-1;
-    return `${a.substring(0, pos)}$refObj.${a.substring(pos)}`; })
-  const evalFunc = betterEval(`function($refObj) {return ${evalText}}`);
+    return `${a.substring(0, pos)}$refObj.${a.substring(pos)}`;
+  });
+  const evalFunc = isOutput ?
+    betterEval(`function($refObj) {return function($evt) {return ${evalText}}}`) :
+    betterEval(`function($refObj) {return ${evalText}}`);
 
   return (data) => {
     return evalFunc(data);

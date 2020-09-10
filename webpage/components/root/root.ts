@@ -7,7 +7,7 @@ export class RootComponent extends Component {
 	static CSS = 'root.css';
 	static META = import.meta;
 
-	private value = 20;
+	private valueRoot = 20;
 	private backStyle = "";
 
 	set setter(val: string) {
@@ -15,7 +15,7 @@ export class RootComponent extends Component {
 	}
 
 	get getter(): number {
-		return this.value;
+		return this.valueRoot;
 	}
 
 	constructor() {
@@ -31,6 +31,6 @@ export class RootComponent extends Component {
 	}
 
 	addToGetter() {
-		this.value++;
+		this.valueRoot++;
 	}
 }
