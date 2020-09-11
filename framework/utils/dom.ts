@@ -85,7 +85,7 @@ export function upgradeNode(node: Node) {
   } else if (node instanceof HTMLElement) {
     upgradeHTMLElement(node as UpgradedHTMLElement);
   } else {
-    (node as UpgradedNode).updateAttributes = function(data) {}
+    (node as UpgradedNode).updateAttributes = function() {}
   }
 }
 

@@ -1,13 +1,15 @@
 import {Service, walkTheDOM} from './mod.ts';
 import {ComponentClass, ComponentWrapper} from './component.ts';
-//import {upgradeEventTargetPrototype} from "./utils/misc.ts";
+import {Pipe, PipeConstructor} from './pipe.ts';
+import {deepFreeze} from './utils/freeze.ts';
 
 export class Framework {
 
-	private services = new Map<Service<any>, any>();
+	private readonly services = new Map<Service<any>, any>();
+	private readonly _pipes: {[_: string]: PipeConstructor} = {};
+	readonly pipes = deepFreeze(this._pipes);
 
 	constructor() {
-		//upgradeEventTargetPrototype();
 		window.addEventListener('DOMContentLoaded', () => {
 			this.setupNodes(document);
 		}, false);
@@ -15,6 +17,10 @@ export class Framework {
 
 	directive() {
 
+	}
+
+	pipe(pipe: Pipe) {
+		this.pipes[pipe.NAME] = pipe.pipeConstructor;
 	}
 
 	component(component: ComponentClass): void {
