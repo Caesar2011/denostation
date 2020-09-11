@@ -8,5 +8,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="HTML TS" level="project" />
+    <orderEntry type="library" name="@types/dom4" level="application" />
   </component>
 </module>

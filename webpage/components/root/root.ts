@@ -12,11 +12,16 @@ export class RootComponent extends Component {
 		month: 6
 	};
 
+	showPromise: Promise<any>|any;
+
 	constructor() {
 		super();
 		const counterService = framework.service(CounterService);
 		counterService.add();
 		counterService.subscribe(evt => {});
+		this.showPromise = new Promise<any>((resolve => {
+			setTimeout(() => resolve({value: "some", hello: "world", num: 10}), 1000);
+		}))
 	}
 
 	alert() {

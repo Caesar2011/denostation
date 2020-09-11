@@ -1,4 +1,8 @@
 <h1>Hello World!</h1>
 <app-counter [(value)]="form.day"></app-counter><br>
 <app-counter [(value)]="form.month"></app-counter><br>
-The counter value is {{form.day}}. <button onclick="alert()"></button>
+The counter value is {{form.day}}. <button onclick="alert()">Alert current value!</button>
+
+<br><br><br><br>
+
+<app-presenter [value]="showPromise | json:    :"></app-presenter>

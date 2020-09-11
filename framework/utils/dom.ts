@@ -1,9 +1,10 @@
 import {betterEval} from "./misc.ts";
 import {BaseComponent, HTMLDataElement} from "../component.ts";
+import {framework} from "../mod.ts";
 
-type ParseFunc<T = any> = (data: any) => T;
+type ParseFunc<T = any> = (data: any) => Promise<T>|T;
 export type NodeUpgrade = {
-  updateAttributes(data: any): void
+  updateAttributes(data: any): Promise<void>;
 }
 export type UpgradedNode = Node & NodeUpgrade;
 type UpgradedText = Text & NodeUpgrade;
@@ -12,8 +13,8 @@ export type ComponentProperties = {methods: string[], getter: string[], setter: 
 
 function upgradeText(node: UpgradedText) {
   const interpolateText = interpolate(node.wholeText);
-  node.updateAttributes = function(data) {
-    this.data = interpolateText(data);
+  node.updateAttributes = async function(data: any) {
+    this.data = await interpolateText(data);
   }
 }
 
@@ -52,9 +53,9 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
       inputHtmlArgs[name] = interpolate(value);
     }
   }
-  (node as any as UpgradedHTMLElement & HTMLDataElement).updateAttributes = function (data) {
+  (node as any as UpgradedHTMLElement & HTMLDataElement).updateAttributes = async function (data: any) {
     for (const key in inputHtmlArgs) {
-      this.setAttribute(key, inputHtmlArgs[key](data));
+      this.setAttribute(key, await inputHtmlArgs[key](data));
     }
     for (const key in outputHtmlArgs) {
       (this as any)[key] = outputHtmlArgs[key](data);
@@ -62,14 +63,14 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
     if (hasComponent) {
       for (const key in inputArgs) {
         const before = beforeValues.get(key);
-        const after = inputArgs[key](data);
+        const after = await inputArgs[key](data);
         if (before !== after) {
           beforeValues.set(key, after);
           this.collectInputChange(key, after);
         }
       }
       for (const key in outputArgs) {
-        this.collectOutputChange(key, (evt) => {
+        this.collectOutputChange(key, (evt: any) => {
           outputArgs[key](data)(evt);
           ((this.getRootNode() as ShadowRoot).host as HTMLDataElement).updateDOM();
         });
@@ -85,7 +86,7 @@ export function upgradeNode(node: Node) {
   } else if (node instanceof HTMLElement) {
     upgradeHTMLElement(node as UpgradedHTMLElement);
   } else {
-    (node as UpgradedNode).updateAttributes = function() {}
+    (node as UpgradedNode).updateAttributes = async function() {}
   }
 }
 
@@ -109,16 +110,39 @@ function interpolate(text: string): ParseFunc<string> {
     collect.push(() => text);
   }
 
-  return (data) => {
-    return collect
-      .map(func => {
-        return (func(data) ?? "").toString();
-      })
-      .join("");
+  return async (data): Promise<string> => {
+    const awaited: string[] = await Promise.all(
+      collect.map(async func => {
+        return String(await func(data) ?? "");
+      }));
+    return awaited.join("");
   };
 }
 
 function evaluate(evalText: string, isOutput: boolean = false): ParseFunc {
+  if (isOutput) return evaluatePart(evalText, isOutput);
+
+  // extract pipes
+  const split: string[] = [];
+  let concat = false;
+  evalText.split("|").forEach(val => {
+    if (val === "") concat = true;
+    else if (concat) split[split.length - 1] += `|${val}`;
+    else split.push(val);
+  });
+  const parts: ParseFunc[] = split.map((str, idx) => {
+    return idx === 0 ? evaluatePart(str) : evaluatePipe(str.trim());
+  });
+
+  return async (data: any) => {
+    for (const part of parts) {
+      data = await part(data);
+    }
+    return data;
+  };
+}
+
+function evaluatePart(evalText: string, isOutput: boolean = false): ParseFunc {
   // match all variable names starting with [a-zA-Z_$] (case-sensitive) except of $evt
   const regex = /(^[ \t]*[a-zA-Z_$])|([^.\sa-zA-Z0-9_$][ \t]*[a-zA-Z_])|([^.\sa-zA-Z0-9_$][ \t]*\$(?!evt))/g;
   evalText = evalText.replace(regex, (a) => {
@@ -140,4 +164,24 @@ function evaluate(evalText: string, isOutput: boolean = false): ParseFunc {
   return (data) => {
     return evalFunc(data);
   };
+}
+
+function evaluatePipe(evalText: string): ParseFunc {
+  const split: string[] = [];
+  let concat = false;
+  evalText.split(":").forEach(val => {
+    if (val.endsWith("\\")) {
+      split.push(val.substring(0, val.length-1));
+      concat = true;
+    }
+    else if (concat) split[split.length - 1] += `:${val}`;
+    else split.push(val);
+  });
+  const pipeConstructor = framework.pipes[split[0]];
+  if (!pipeConstructor) {
+    console.warn(`The pipe '${split[0]}' is not registered!`);
+    return data => data;
+  } else {
+    return pipeConstructor(...split.slice(1));
+  }
 }

@@ -55,7 +55,7 @@ const handler: ProxyHandler<BaseComponent> = {
 			if (PROTECTED_PROPERTIES.includes(p)) {
 				Object.defineProperty(target, p, { configurable: false, writable: false });
 			} else if (beforeValue !== value) {
-				//console.log(`update >${p.toString()}< to value >${value}< on target:`, target, 'receiver:', receiver);
+				console.log(`update >${p.toString()}< to value >${value}< on target:`, target, 'receiver:', receiver);
 				target.onUpdate(p, value, beforeValue);
 			}
 		}
@@ -125,7 +125,9 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 
 		updateDOM(): void {
 			walkTheDOM(this.root, (node: Node) => {
-				(node as UpgradedNode).updateAttributes(this.data);
+				(node as UpgradedNode)
+					.updateAttributes(this.data)
+					.catch(err => console.error("Error on resolving DOM update!", err));
 			});
 		}
 
@@ -134,7 +136,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 				this.outputs[p](value);
 		}
 
-		onMutation(mutations: MutationRecord[]) {
+		private onMutation(mutations: MutationRecord[]) {
 			const attributeChanges: {[key: string]: [any, any]} = {};
 			let found = false;
 			for (const mutation of mutations) {

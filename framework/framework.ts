@@ -16,11 +16,10 @@ export class Framework {
 	}
 
 	directive() {
-
 	}
 
 	pipe(pipe: Pipe) {
-		this.pipes[pipe.NAME] = pipe.pipeConstructor;
+		this._pipes[pipe.NAME] = pipe.pipeConstructor;
 	}
 
 	component(component: ComponentClass): void {

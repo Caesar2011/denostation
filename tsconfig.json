@@ -17,16 +17,13 @@
     "noStrictGenericChecks": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "preserveConstEnums": false,
     "removeComments": false,
-    "resolveJsonModule": true,
     "strict": true,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "suppressExcessPropertyErrors": false,
-    "suppressImplicitAnyIndexErrors": false,
-    "useDefineForClassFields": false
+    "suppressImplicitAnyIndexErrors": false
   }
 }
