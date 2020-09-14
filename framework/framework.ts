@@ -39,10 +39,10 @@ export class Framework {
 		});
 	}
 
-	service<T>(service: Service<T>): T {
+	service<T>(service: Service<T>, ...args: any[]): T {
 		let instance = this.services.get(service);
 		if (!instance) {
-			instance = new service();
+			instance = new service(...args);
 			this.services.set(service, instance);
 		}
 		return instance;
