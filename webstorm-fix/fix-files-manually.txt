@@ -1,0 +1,4 @@
+
+// ~/.local/share/JetBrains/Webstorm2020.2/deno/deno-service/node_modules/ws-typescript-plugin/index.js
+
+result.push(getDenoDtsPath() + "/lib.dom.d.ts");

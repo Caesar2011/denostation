@@ -141,7 +141,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			let found = false;
 			for (const mutation of mutations) {
 				if (mutation.type === "attributes") {
-					const attributeName = mutation.attributeName ?? "null";
+					const attributeName = mutation.attributeName || "null";
 					const value = this.getAttribute(attributeName);
 					if (mutation.oldValue !== value) {
 						attributeChanges[attributeName] = [mutation.oldValue, value];
@@ -154,7 +154,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 		}
 
 		collectInputChange(key: string, value: any): void {
-			if (!(base.INPUTS ?? []).includes(key)) {
+			if (!(base.INPUTS || []).includes(key)) {
 				console.error(`The component '${base.NAME}' does not export '${key}' as input.`);
 				return;
 			}
@@ -165,7 +165,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 		}
 
 		collectOutputChange(key: string, value: (evt: any) => void): void {
-			if (!(base.OUTPUTS ?? []).includes(key)) {
+			if (!(base.OUTPUTS || []).includes(key)) {
 				console.error(`The component '${base.NAME}' does not export '${key}' as output.`);
 				return;
 			}
@@ -189,14 +189,14 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			const allMethods = Object
 				.getOwnPropertyNames(prototype)
 				.filter((elem => !PROTECTED_METHODS.includes(elem)));
-			const methods = [];
+			const methods: any[] = [];
 			const getter = [...properties];
 			const setter = [...properties];
 			for (const method of allMethods) {
 				if (typeof (this.data as any)[method] === 'function') {
 					methods.push(method);
 				} else {
-					const descriptor = Object.getOwnPropertyDescriptor(prototype, method) ?? {};
+					const descriptor = Object.getOwnPropertyDescriptor(prototype, method) || {};
 					if (descriptor.get) {
 						getter.push(method);
 					}

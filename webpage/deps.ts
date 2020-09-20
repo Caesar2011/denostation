@@ -1,1 +1,1 @@
-export { framework, Framework, Component } from '../framework/mod.ts';
+export { framework, Framework, Component, ResourceService, JsonPipe, ResourcePipe } from '../framework/mod.ts';

@@ -1,4 +1,5 @@
 import {Component} from '../../../framework/component.ts';
+import {framework, ResourceService} from "../../deps.ts";
 
 export class CounterComponent extends Component {
 	static NAME = "app-counter";
@@ -7,6 +8,7 @@ export class CounterComponent extends Component {
 	static INPUTS = ["value"];
 	static OUTPUTS = ["value"];
 
+	private readonly resService = framework.service(ResourceService);
 	value = 10;
 
 	constructor() {
@@ -19,6 +21,10 @@ export class CounterComponent extends Component {
 
 	up() {
 		this.value++;
+	}
+
+	showValue(value: any) {
+		return this.resService.getString("counter", value);
 	}
 
 	onInputChanged(attributeChanges: { [p: string]: [any, any] }) {

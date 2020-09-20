@@ -1,0 +1,9 @@
+{
+  "hello_world": "Hallo Welt!",
+  "counter": "Der Wert des Zählers ist %1$d.",
+  "age": {
+    "zero": "Nicht mal n' Jahr alt!",
+    "one": "Nur ein Jahr alt!",
+    "other": "Er ist schon %1$d Jährchen alt! Soooo alt..."
+  }
+}

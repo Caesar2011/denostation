@@ -8,7 +8,7 @@
     "disableSizeLimit": false,
     "jsx": "react",
     "jsxFactory": "React.createElement",
-    "lib": ["es2016", "dom"],
+    "lib": ["es2018", "dom"],
     "noFallthroughCasesInSwitch": false,
     "noImplicitAny": true,
     "noImplicitReturns": true,
@@ -24,6 +24,9 @@
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "suppressExcessPropertyErrors": false,
-    "suppressImplicitAnyIndexErrors": false
+    "suppressImplicitAnyIndexErrors": false,
+
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
   }
 }

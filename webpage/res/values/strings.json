@@ -1,0 +1,9 @@
+{
+  "hello_world": "Hello World!",
+  "counter": "The counter value is %1$d.",
+  "age": {
+    "zero": "Just few months old!",
+    "one": "He is one year old!",
+    "other": "He is %1$d years old! So old..."
+  }
+}

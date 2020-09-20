@@ -30,7 +30,7 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
   for (let idx in node.attributes) {
     if (!node.attributes.hasOwnProperty(idx)) continue;
     let name = node.attributes[idx].nodeName;
-    const value = node.attributes[idx].nodeValue ?? "";
+    const value = node.attributes[idx].nodeValue || "";
     if (name.startsWith("[(")) { // two-way binding
       if (hasComponent) {
         name = name.substring(2, name.length-2);
@@ -113,7 +113,7 @@ function interpolate(text: string): ParseFunc<string> {
   return async (data): Promise<string> => {
     const awaited: string[] = await Promise.all(
       collect.map(async func => {
-        return String(await func(data) ?? "");
+        return String(await func(data) || "");
       }));
     return awaited.join("");
   };
@@ -183,5 +183,15 @@ function evaluatePipe(evalText: string): ParseFunc {
     return data => data;
   } else {
     return pipeConstructor(...split.slice(1));
+  }
+}
+
+export function walkTheDOM(node: Node, func: (node: Node) => void) {
+  func(node);
+  let child = node.firstChild;
+
+  while (child) {
+    walkTheDOM(child, func);
+    child = child.nextSibling;
   }
 }
