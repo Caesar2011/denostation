@@ -11,8 +11,22 @@ export function hasOwnProperty<T extends object, K extends keyof T>(object: T, k
 
 export function* iterateEnum(x: any): Generator<number> {
 	for (let item in x) {
+		if (!x.hasOwnProperty(item)) continue;
 		const num = Number(item);
 		if (isNaN(num)) continue;
 		yield num as any;
 	}
+}
+
+export function debounce(func: Function, wait: number) {
+	let timeout: number;
+	return function executedFunction(...args: any[]) {
+		const later = () => {
+			clearTimeout(timeout);
+			func(...args);
+		};
+
+		clearTimeout(timeout);
+		timeout = setTimeout(later, wait);
+	};
 }

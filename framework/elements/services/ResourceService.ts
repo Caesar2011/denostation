@@ -4,11 +4,12 @@ import {
   ASPECT_RATIO, CONSTRAINT_GENERATORS, CONSTRAINT_REGEX,
   Constraints, EntityPaths, LAYOUT_DIRECTION, NIGHT_MODE,
   RESOURCE_VERSION,
-  ResourceFile, SCREEN_ORIENTATION,
+  ResourceFile, ResourceFolder, SCREEN_ORIENTATION,
   SCREEN_SIZE, TOUCH_MODE
 } from "../../utils/resource-mapping.ts";
-import {hasOwnProperty} from "../../utils/misc.ts";
+import {debounce, hasOwnProperty} from "../../utils/misc.ts";
 import {sprintf} from "../../utils/sprintf@1.1.2.ts";
+import {framework} from "../../mod.ts";
 
 export class ResourceService extends CachedEventTarget {
   private constraints: {[key in Constraints]: string|undefined} = {
@@ -31,6 +32,7 @@ export class ResourceService extends CachedEventTarget {
   private pluralRules: {select(quantity: number): string} = this.DEFAULT_PLURAL_RULES;
   private widthPx: number = window.innerWidth || document.body.clientWidth;
   private heightPx: number = window.innerHeight || document.body.clientHeight;
+  protected debouncedUpdateDom = debounce(framework.notifyNodeUpdate, 200);
 
   public get lang() { return this.get(Constraints.LANG); }
   public set lang(val: string|undefined) { this.set(Constraints.LANG, val); this.updatePluralRules(); }
@@ -39,7 +41,9 @@ export class ResourceService extends CachedEventTarget {
   public get layoutDirection() { return this.get(Constraints.LAYOUT_DIRECTION) as LAYOUT_DIRECTION|undefined; }
   public set layoutDirection(val: LAYOUT_DIRECTION|undefined) { this.set(Constraints.LAYOUT_DIRECTION, val); }
   public get width() { return this.get(Constraints.WIDTH); }
+  private set _width(val: string|undefined) { this.set(Constraints.WIDTH, val); }
   public get height() { return this.get(Constraints.HEIGHT); }
+  private set _height(val: string|undefined) { this.set(Constraints.HEIGHT, val); }
   public get screenSize() { return this.get(Constraints.SCREEN_SIZE) as SCREEN_SIZE; }
   public get screenAspect() { return this.get(Constraints.SCREEN_ASPECT) as ASPECT_RATIO; }
   public get screenOrientation() { return this.get(Constraints.SCREEN_ORIENTATION) as SCREEN_ORIENTATION; }
@@ -65,9 +69,8 @@ export class ResourceService extends CachedEventTarget {
     this.loadResources()
       .catch((e) => console.error("Loading resources failed!", e));
     window.addEventListener("resize", () => {
-      console.log("resize");
-      this.set(Constraints.WIDTH, this.initWidth());
-      this.set(Constraints.HEIGHT, this.initHeight());
+      this._width = this.initWidth();
+      this._height = this.initHeight();
     });
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -77,7 +80,7 @@ export class ResourceService extends CachedEventTarget {
 
     const info = this.initBrowserInfo();
     this.constraints[Constraints.BROWSER_NAME] = info[0];
-    this.constraints[Constraints.BROWSER_VERSION] = info[1]+"v";
+    this.constraints[Constraints.BROWSER_VERSION] = info[1] !== undefined ? info[1]+"v" : undefined;
     this.updatePluralRules();
   }
 
@@ -161,9 +164,10 @@ export class ResourceService extends CachedEventTarget {
 
   private emitConstraintChange(constraint: Constraints) {
     this.dispatchEvent(new CustomEvent("constraintChange", {detail: constraint}));
+    this.debouncedUpdateDom();
   }
 
-  protected async *fileIterator(dir: "values"|"drawable", file: string, consumer: (res: Response) => Promise<any>): AsyncGenerator<any> {
+  protected async *fileIterator(dir: ResourceFolder, file: string, consumer: (res: Response) => Promise<any>): AsyncGenerator<any> {
     const that = this;
     function* findResourcePaths(paths: EntityPaths): Generator<string> {
       console.log("go deeper:", paths);

@@ -1,6 +1,13 @@
 import {globToRegExp, join, relative} from 'https://deno.land/std@0.69.0/path/mod.ts';
 import {walkSync} from 'https://deno.land/std@0.69.0/fs/walk.ts';
-import {CONSTRAINT_REGEX, Constraints, EntityPaths, RESOURCE_VERSION, ResourceFile} from "../utils/resource-mapping.ts";
+import {
+  CONSTRAINT_REGEX,
+  Constraints,
+  EntityPaths,
+  RESOURCE_VERSION,
+  ResourceFile,
+  ResourceFolder
+} from "../utils/resource-mapping.ts";
 import {iterateEnum} from "../utils/misc.ts";
 
 const RES_FOLDER = "./webpage/res";
@@ -12,8 +19,8 @@ let iterator = walkSync(RES_FOLDER, {
   })]
 });
 
-const regexValues = /[\\/](values|drawable)[\\/]([^\\/]+)\.([a-z]{1,10})$/;
-const resources: ResourceFile = {version: RESOURCE_VERSION, drawable: {}, values: {}};
+const regexValues = /[\\/](values|drawables|styles)[\\/]([^\\/]+)\.([a-z]{1,10})$/;
+const resources: ResourceFile = {version: RESOURCE_VERSION, drawables: {}, values: {}, styles: {}};
 
 for (const value of iterator) {
   if (value.isFile && !value.isSymlink) {
@@ -23,7 +30,7 @@ for (const value of iterator) {
     if (path.length === 0) continue;
     path[0] = `${path[0]}.${match[3] || ""}`;
     console.log(value);
-    addResource(resources[match[1] as "values"|"drawable"], path, value.path);
+    addResource(resources[match[1] as ResourceFolder], path, value.path);
     console.log(JSON.stringify(resources, null, " "));
     console.log("-----------");
   }

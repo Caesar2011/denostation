@@ -4,7 +4,7 @@ import {framework} from "../mod.ts";
 
 type ParseFunc<T = any> = (data: any) => Promise<T>|T;
 export type NodeUpgrade = {
-  updateAttributes(data: any): Promise<void>;
+  updateAttributes(data: any, forceAnyUpdate: boolean): Promise<void>;
 }
 export type UpgradedNode = Node & NodeUpgrade;
 type UpgradedText = Text & NodeUpgrade;
@@ -24,7 +24,7 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
   const outputHtmlArgs: {[_: string]: ParseFunc} = {};
   const outputArgs: {[_: string]: ParseFunc} = {};
 
-  const hasComponent = node.hasOwnProperty("data") && (node as any).data instanceof BaseComponent;
+  const hasComponent = isHTMLDataElement(node);
   const beforeValues = new Map<PropertyKey, any>();
 
   for (let idx in node.attributes) {
@@ -53,14 +53,14 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
       inputHtmlArgs[name] = interpolate(value);
     }
   }
-  (node as any as UpgradedHTMLElement & HTMLDataElement).updateAttributes = async function (data: any) {
+  node.updateAttributes = async function (data: any, forceAnyUpdate: boolean) {
     for (const key in inputHtmlArgs) {
       this.setAttribute(key, await inputHtmlArgs[key](data));
     }
     for (const key in outputHtmlArgs) {
       (this as any)[key] = outputHtmlArgs[key](data);
     }
-    if (hasComponent) {
+    if (isHTMLDataElement(this)) {
       for (const key in inputArgs) {
         const before = beforeValues.get(key);
         const after = await inputArgs[key](data);
@@ -76,6 +76,9 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
         });
       }
       this.notifyInputChanged();
+      if (forceAnyUpdate) {
+        this.updateDOM(forceAnyUpdate);
+      }
     }
   }
 }
@@ -184,6 +187,10 @@ function evaluatePipe(evalText: string): ParseFunc {
   } else {
     return pipeConstructor(...split.slice(1));
   }
+}
+
+export function isHTMLDataElement(node: Node): node is HTMLDataElement {
+  return node.hasOwnProperty("data") && (node as any).data instanceof BaseComponent;
 }
 
 export function walkTheDOM(node: Node, func: (node: Node) => void) {

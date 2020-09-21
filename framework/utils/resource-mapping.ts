@@ -1,9 +1,10 @@
 export const RESOURCE_VERSION: number = 1;
 
+export type ResourceFolder = "values"|"drawables"|"styles";
 export type ResourceFile = {
-  version: typeof RESOURCE_VERSION,
-  drawable: {[name: string]: EntityPaths},
-  values: {[name: string]: EntityPaths},
+  [folder in ResourceFolder]: { [name: string]: EntityPaths; };
+} & {
+  version: typeof RESOURCE_VERSION;
 };
 
 export type EntityPaths = {

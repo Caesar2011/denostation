@@ -2,6 +2,7 @@ import {Service, walkTheDOM} from './mod.ts';
 import {ComponentClass, ComponentWrapper} from './component.ts';
 import {Pipe, PipeConstructor} from './pipe.ts';
 import {deepFreeze} from './utils/freeze.ts';
+import {isHTMLDataElement} from "./utils/dom.ts";
 
 export class Framework {
 
@@ -28,6 +29,23 @@ export class Framework {
 		}
 	}
 
+	service<T>(service: Service<T>, ...args: any[]): T {
+		let instance = this.services.get(service);
+		if (!instance) {
+			instance = new service(...args);
+			this.services.set(service, instance);
+		}
+		return instance;
+	}
+
+	notifyNodeUpdate() {
+		walkTheDOM(document, node => {
+			if (isHTMLDataElement(node)) {
+				node.updateDOM(true);
+			}
+		});
+	}
+
 	setupNodes(node: Node, callback?: (node: Node) => void): void {
 		walkTheDOM(node, node => {
 			if (callback) callback(node);
@@ -37,14 +55,5 @@ export class Framework {
 				}
 			}
 		});
-	}
-
-	service<T>(service: Service<T>, ...args: any[]): T {
-		let instance = this.services.get(service);
-		if (!instance) {
-			instance = new service(...args);
-			this.services.set(service, instance);
-		}
-		return instance;
 	}
 }

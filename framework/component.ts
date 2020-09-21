@@ -74,7 +74,7 @@ export const Component: BaseComponentClass = new Proxy(BaseComponent, constructH
 
 export interface HTMLDataElement<T extends BaseComponent = BaseComponent> extends HTMLElement {
 	data: T;
-	updateDOM(): void;
+	updateDOM(forceAnyUpdate?: boolean): void;
 	fireOutput(p: string, value: any): void;
 	collectInputChange(key: string, value: any): void;
 	collectOutputChange(key: string, value: (evt: any) => void): void;
@@ -123,10 +123,10 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			this.data.onInit(this.root);
 		}
 
-		updateDOM(): void {
+		updateDOM(forceAnyUpdate: boolean = false): void {
 			walkTheDOM(this.root, (node: Node) => {
 				(node as UpgradedNode)
-					.updateAttributes(this.data)
+					.updateAttributes(this.data, forceAnyUpdate)
 					.catch(err => console.error("Error on resolving DOM update!", err));
 			});
 		}
@@ -174,7 +174,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			}
 		}
 
-		notifyInputChanged(): void {
+		notifyInputChanged(forceAnyUpdate: boolean = false): void {
 			if (Object.keys(this.inputChanges).length > 0) {
 				this.data.onInputChanged(this.inputChanges);
 				this.inputChanges = {};
