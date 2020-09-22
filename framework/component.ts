@@ -1,6 +1,6 @@
 import {resolve} from './utils/path.ts';
 import {framework, Instantiable, walkTheDOM} from './mod.ts';
-import {ComponentProperties, UpgradedNode, upgradeNode} from "./utils/dom.ts";
+import {ComponentProperties, UpgradedNode} from "./utils/dom.ts";
 import {IDirective} from './directive.ts';
 
 const symUpdatesBeforeInit = Symbol("updatesBeforeInit");
@@ -78,7 +78,7 @@ export interface HTMLDataElement<T extends BaseComponent = BaseComponent> extend
 	updateDOM(forceAnyUpdate?: boolean): void;
 	fireOutput(p: string, value: any): void;
 	collectInputChange(key: string, value: any): boolean;
-	collectOutputChange(key: string, value: (evt: any) => void): void;
+	collectOutputChange(key: string, value: (evt: any) => void): boolean;
 	notifyInputChanged(): void;
 }
 
@@ -118,9 +118,7 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			}
 			this.dispatchEvent(new CustomEvent('custom', {detail: 4}));
 
-			framework.setupNodes(this.root, node => {
-				upgradeNode(node);
-			});
+			framework.setupNodes(this.root);
 			this.data.onInit(this.root);
 		}
 
@@ -165,14 +163,14 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 			return true;
 		}
 
-		collectOutputChange(key: string, value: (evt: any) => void): void {
+		collectOutputChange(key: string, value: (evt: any) => void): boolean {
 			if (!(base.OUTPUTS || []).includes(key)) {
-				console.error(`The component '${base.NAME}' does not export '${key}' as output.`);
-				return;
+				return false;
 			}
 			if (this.properties.setter.includes(key)) {
 				this.outputs[key] = value;
 			}
+			return true;
 		}
 
 		notifyInputChanged(forceAnyUpdate: boolean = false): void {

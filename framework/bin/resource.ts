@@ -29,10 +29,7 @@ for (const value of iterator) {
     const path = (match[2] || "").split("-").filter(x => !!x);
     if (path.length === 0) continue;
     path[0] = `${path[0]}.${match[3] || ""}`;
-    console.log(value);
     addResource(resources[match[1] as ResourceFolder], path, value.path);
-    console.log(JSON.stringify(resources, null, " "));
-    console.log("-----------");
   }
 }
 
@@ -57,12 +54,11 @@ function addResource(obj: {[name: string]: EntityPaths}, path: string[], uri: st
   } else {
     const nextConstraintType = classifyType(path[0]);
     const currConstraintType = obj[next].nextConstraint ? Number(obj[next].nextConstraint) : -1;
-    console.log("XX", nextConstraintType, currConstraintType);
     if (currConstraintType === -1) {
       obj[next].nextConstraint = String(nextConstraintType);
       obj[next].subPaths = {};
     } else if (nextConstraintType === undefined) {
-      console.log(`Ignoring resource with unknown constraint '${path[0]}:'`, uri);
+      console.warn(`Ignoring resource with unknown constraint '${path[0]}:'`, uri);
     } else if (currConstraintType < nextConstraintType) {
       // next one is less important -> any branch
       path.unshift("*");

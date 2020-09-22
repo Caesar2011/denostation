@@ -1,8 +1,8 @@
-import {Service, walkTheDOM} from './mod.ts';
+import {framework, Service, walkTheDOM} from './mod.ts';
 import {ComponentClass, ComponentWrapper} from './component.ts';
 import {Pipe, PipeConstructor} from './pipe.ts';
 import {deepFreeze} from './utils/freeze.ts';
-import {isHTMLDataElement} from "./utils/dom.ts";
+import {isHTMLDataElement, upgradeNode} from "./utils/dom.ts";
 import {DirectiveClass} from './directive.ts';
 
 export class Framework {
@@ -16,7 +16,7 @@ export class Framework {
 
 	constructor() {
 		window.addEventListener('DOMContentLoaded', () => {
-			this.setupNodes(document);
+			framework.setupNodes(document);
 		}, false);
 	}
 
@@ -69,9 +69,9 @@ export class Framework {
 		});
 	}
 
-	setupNodes(node: Node, callback?: (node: Node) => void): void {
-		walkTheDOM(node, node => {
-			if (callback) callback(node);
+	setupNodes(root: Node): void {
+		walkTheDOM(root, node => {
+			upgradeNode(node);
 			if (node instanceof HTMLElement) {
 				if (node.hasAttribute("*if")) {
 

@@ -1,7 +1,7 @@
 import {betterEval} from "./misc.ts";
 import {BaseComponent, HTMLDataElement} from "../component.ts";
 import {framework} from "../mod.ts";
-import {BaseDirective} from '../directive.ts';
+import {BaseDirective, DirectiveClass} from '../directive.ts';
 
 type ParseFunc<T = any> = (data: any) => Promise<T>|T;
 export type NodeUpgrade = {
@@ -18,14 +18,26 @@ function upgradeText(node: Text) {
     this.data = await interpolateText(data);
   }
 }
+
 type InOutput = "input"|"output";
-function addDirectives(directives: { [_ in InOutput]: { [p: string]: BaseDirective[] } }, namePart: string, options: { [_ in InOutput]?: boolean }): boolean {
+type AddDirectivesOptions = { [_ in InOutput]?: boolean } & {
+  directiveCache: Map<DirectiveClass, BaseDirective>,
+  directives: { [_ in InOutput]: { [p: string]: BaseDirective[] } },
+  node: HTMLElement
+};
+function addDirectives(namePart: string, opts: AddDirectivesOptions): boolean {
   let found = false;
-  if (options.input) {
-    const dirs = framework.directive(namePart, true);
-    if (dirs.length) {
-      found = true;
-      directives.input[namePart] = di
+  for (const type of ["input", "output"] as InOutput[]) {
+    if (opts[type]) {
+      const dirs = framework.directive(namePart, type === "input");
+      if (dirs.length) {
+        found = true;
+        opts.directives[type][namePart] = dirs
+          .map(dir =>
+            opts.directiveCache.get(dir)
+            || opts.directiveCache.set(dir, new dir(opts.node)).get(dir) as BaseDirective
+          );
+      }
     }
   }
   return found;
@@ -38,6 +50,7 @@ function upgradeHTMLElement(node: HTMLElement) {
   const outputArgs: {[_: string]: ParseFunc} = {};
 
   const directives: {[_ in InOutput]: {[name: string]: BaseDirective[]}} = {input: {}, output: {}};
+  const directiveCache = new Map<DirectiveClass, BaseDirective>();
 
   const hasComponent = isHTMLDataElement(node);
   let hasDirective = false;
@@ -49,7 +62,7 @@ function upgradeHTMLElement(node: HTMLElement) {
     const value = node.attributes[idx].nodeValue || "";
     if (name.startsWith("[(")) { // two-way binding
       const namePart = name.substring(2, name.length-2);
-      const nameIsDirective = addDirectives(directives, namePart, {input: true, output: true});
+      const nameIsDirective = addDirectives(namePart, {directives, directiveCache, node, input: true, output: true});
       hasDirective = hasDirective || nameIsDirective;
       if (hasComponent || nameIsDirective) {
         inputArgs[namePart] = evaluate(value);
@@ -57,14 +70,14 @@ function upgradeHTMLElement(node: HTMLElement) {
       }
     } else if (name.startsWith("[")) { // input
       const namePart = name.substring(1, name.length-1);
-      const nameIsDirective = addDirectives(directives, namePart, {input: true});
+      const nameIsDirective = addDirectives(namePart, {directives, directiveCache, node, input: true});
       hasDirective = hasDirective || nameIsDirective;
       if (hasComponent || nameIsDirective) {
         inputArgs[namePart] = evaluate(value);
       }
     } else if (name.startsWith("(")) { // output
       const namePart = name.substring(1, name.length-1);
-      const nameIsDirective = addDirectives(directives, namePart, {output: true});
+      const nameIsDirective = addDirectives(namePart, {directives, directiveCache, node, output: true});
       hasDirective = hasDirective || nameIsDirective;
       if (hasComponent || nameIsDirective) {
         outputArgs[namePart] = evaluate(value, true);
@@ -88,20 +101,31 @@ function upgradeHTMLElement(node: HTMLElement) {
         const after = await inputArgs[key](data);
         if (before !== after) {
           beforeValues.set(key, after);
-          this.collectInputChange(key, after);
-          //console.error(`The component '${this.tagName}' does not export '${key}' as input.`);
+          const emitC = hasComponent ? !(this as any as HTMLDataElement).collectInputChange(key, after) : true;
+          const emitD = !(directives.input[key] || []).map(dir => dir.collectInputChange(key, after)).some(x => x);
+          if (emitC && emitD) {
+            console.error(`The component '${this.tagName}' does not export '${key}' as input.`);
+          }
         }
       }
       for (const key in outputArgs) {
-        this.collectOutputChange(key, (evt: any) => {
+        const outputFunc = (evt: any) => {
           outputArgs[key](data)(evt);
           ((this.getRootNode() as ShadowRoot).host as HTMLDataElement).updateDOM();
-        });
+        };
+        const emitC = hasComponent ? !(this as any as HTMLDataElement).collectOutputChange(key, outputFunc) : false;
+        const emitD = !(directives.output[key] || []).map(dir => dir.collectOutputChange(key, outputFunc)).some(x => x);
+        if (emitC && emitD) {
+          console.error(`The component '${this.tagName}' does not export '${key}' as output.`);
+        }
       }
-      this.notifyInputChanged();
-      if (forceAnyUpdate) {
-        this.updateDOM(forceAnyUpdate);
+      if (hasComponent) {
+        (this as any as HTMLDataElement).notifyInputChanged();
+        if (forceAnyUpdate) {
+          (this as any as HTMLDataElement).updateDOM(forceAnyUpdate);
+        }
       }
+      directiveCache.forEach((value, key) => value.notifyInputChanged());
     }
   }
 }

@@ -1,8 +1,10 @@
 <h1>{{ "" | res:hello_world }}</h1>
 <app-counter [(value)]="form.day"></app-counter><br>
-<app-counter [some]="form" [(value)]="form.month"></app-counter><br>
+<app-counter [(value)]="form.month"></app-counter><br>
 The counter value is {{form.day}}. <button onclick="alert()">Alert current value!</button>
 
-<br><br><br><br>
+<br><br>
+<img [res]="'banner.jpg'">
+<br><br>
 
 <app-presenter [value]="showPromise | json:    :"></app-presenter>

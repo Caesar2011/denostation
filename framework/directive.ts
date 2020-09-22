@@ -1,15 +1,24 @@
 import {Instantiable} from './utils/misc.ts';
-import {BaseComponent} from './component.ts';
 
 export interface IDirective {
 	collectInputChange(key: string, value: any): boolean;
-	collectOutputChange(key: string, value: (evt: any) => void): void;
+	collectOutputChange(key: string, value: (evt: any) => void): boolean;
 	notifyInputChanged(): void;
 }
 
 
-export abstract class BaseDirective implements IDirective {
-	constructor(protected component: HTMLElement) {
+export class BaseDirective implements IDirective {
+	constructor(protected readonly component: HTMLElement) { }
+
+	collectInputChange(key: string, value: any): boolean {
+		return false;
+	}
+
+	collectOutputChange(key: string, value: (evt: any) => void): boolean {
+		return false;
+	}
+
+	notifyInputChanged(): void {
 	}
 }
 

@@ -26,7 +26,6 @@ export class ResourceService extends CachedEventTarget {
     [Constraints.BROWSER_NAME]: undefined,
     [Constraints.BROWSER_VERSION]: undefined,
   };
-  private resources: ResourceFile|undefined;
   private fetchedResources: {[resUri: string]: Array<[(val: any) => void, (val: any) => void]>| { consumed: any }} = {};
   protected readonly DEFAULT_PLURAL_RULES = {select: (quantity: number) => "other"};
   private pluralRules: {select(quantity: number): string} = this.DEFAULT_PLURAL_RULES;
@@ -44,9 +43,12 @@ export class ResourceService extends CachedEventTarget {
   private set _width(val: string|undefined) { this.set(Constraints.WIDTH, val); }
   public get height() { return this.get(Constraints.HEIGHT); }
   private set _height(val: string|undefined) { this.set(Constraints.HEIGHT, val); }
-  public get screenSize() { return this.get(Constraints.SCREEN_SIZE) as SCREEN_SIZE; }
+  public get screenSize() { return this.get(Constraints.SCREEN_SIZE) as SCREEN_SIZE|undefined; }
+  private set _screenSize(val: SCREEN_SIZE|undefined) { this.set(Constraints.SCREEN_SIZE, val); }
   public get screenAspect() { return this.get(Constraints.SCREEN_ASPECT) as ASPECT_RATIO; }
+  private set _screenAspect(val: ASPECT_RATIO) { this.set(Constraints.SCREEN_ASPECT, val); }
   public get screenOrientation() { return this.get(Constraints.SCREEN_ORIENTATION) as SCREEN_ORIENTATION; }
+  private set _screenOrientation(val: SCREEN_ORIENTATION) { this.set(Constraints.SCREEN_ORIENTATION, val); }
   public get nightMode() { return this.get(Constraints.NIGHT_MODE) as NIGHT_MODE; }
   public set nightMode(val: NIGHT_MODE) { this.set(Constraints.NIGHT_MODE, val); }
   public get isTouch() { return this.get(Constraints.IS_TOUCH) as TOUCH_MODE|undefined; }
@@ -66,11 +68,18 @@ export class ResourceService extends CachedEventTarget {
 
   constructor(private resFolder: string) {
     super();
-    this.loadResources()
+    this.getResources()
+      .then(resources => {
+        if (resources.version !== RESOURCE_VERSION)
+          console.error("Resource file version does not match! Resource resolution may not work and cause errors.");
+      })
       .catch((e) => console.error("Loading resources failed!", e));
     window.addEventListener("resize", () => {
       this._width = this.initWidth();
       this._height = this.initHeight();
+      this._screenSize = this.initScreenSize();
+      this._screenAspect = this.initScreenAspectRatio();
+      this._screenOrientation = this.initScreenOrientation();
     });
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -84,14 +93,8 @@ export class ResourceService extends CachedEventTarget {
     this.updatePluralRules();
   }
 
-  protected async loadResources() {
-    const url = new URL([window.location.href, this.resFolder, "./list.json"].join("/")).href;
-    const res = await fetch(url);
-    const text = await res.text();
-    this.resources = JSON.parse(text);
-    if (this.resources && this.resources.version !== RESOURCE_VERSION) {
-      console.error("Resource file version does not match! Resource resolution may not work and cause errors.");
-    }
+  protected async getResources(): Promise<ResourceFile> {
+    return this.fetchFile("list.json", res => res.json());
   }
 
   protected initLanguage(): string|undefined {
@@ -123,10 +126,10 @@ export class ResourceService extends CachedEventTarget {
     const h = this.heightPx || 320;
     const w = this.widthPx || 460;
     const area = h*w;
-    if (area > 320*426) return "small";
-    else if (area > 460*640) return "normal";
+    if (area > 1000*1600) return "xlarge";
     else if (area > 840*1020) return "large";
-    else if (area > 1000*1600) return "xlarge";
+    else if (area > 460*640) return "normal";
+    else if (area > 320*426) return "small";
     else return undefined;
   }
 
@@ -167,10 +170,9 @@ export class ResourceService extends CachedEventTarget {
     this.debouncedUpdateDom();
   }
 
-  protected async *fileIterator(dir: ResourceFolder, file: string, consumer: (res: Response) => Promise<any>): AsyncGenerator<any> {
+  protected async *fileIterator(dir: ResourceFolder, file: string): AsyncGenerator<any> {
     const that = this;
     function* findResourcePaths(paths: EntityPaths): Generator<string> {
-      console.log("go deeper:", paths);
       if (paths.subPaths && paths.nextConstraint) {
         const nextConstraint = Number(paths.nextConstraint) as Constraints;
         const keys = Object.keys(paths.subPaths).filter(x => x !== "*");
@@ -190,14 +192,15 @@ export class ResourceService extends CachedEventTarget {
       }
       if (paths.defPath) yield paths.defPath;
     }
-    if (this.resources) {
-      for (const path of findResourcePaths(this.resources[dir][file])) {
-        yield await this.loadResourceFile(path, consumer);
+    const resources = await this.getResources();
+    if (resources) {
+      for (const path of findResourcePaths(resources[dir][file])) {
+        yield path;
       }
     }
   }
 
-  protected async loadResourceFile(path: string, consumer: (res: Response) => Promise<any>): Promise<any> {
+  protected async fetchFile(path: string, consumer: (res: Response) => Promise<any>): Promise<any> {
     return new Promise((resolve, reject) => {
       if (hasOwnProperty(this.fetchedResources, path)) {
         if (hasOwnProperty(this.fetchedResources[path], "consumed")) {
@@ -208,7 +211,6 @@ export class ResourceService extends CachedEventTarget {
       } else {
         this.fetchedResources[path] = [[resolve, reject]];
         const url = new URL([window.location.href, this.resFolder, path].join("/")).href;
-        console.log(url);
         fetch(url).then(async res => {
           const callbacks = (this.fetchedResources[path] as Array<any>);
           const consumed = await consumer(res);
@@ -224,10 +226,35 @@ export class ResourceService extends CachedEventTarget {
   }
 
   protected async getResourceValue(dir: "values", file: string, res: string): Promise<any> {
-    for await (const json of this.fileIterator(dir, file, f => f.json())) {
+    for await (const path of this.fileIterator(dir, file)) {
+      const json = await this.fetchFile(path, f => f.json());
       if (hasOwnProperty(json, res)) return json[res];
     }
     return undefined;
+  }
+
+  protected async getResourcePath(dir: "drawables", file: string): Promise<string|undefined> {
+    for await (const path of this.fileIterator(dir, file)) {
+      return path;
+    }
+    return undefined;
+  }
+
+  protected async getResourcePaths(dir: "styles", file: string): Promise<string[]> {
+    const paths = [];
+    for await (const path of this.fileIterator(dir, file)) {
+      paths.push(path);
+    }
+    return paths;
+  }
+
+  public async getDrawable(res: string): Promise<{ src: string|undefined, alt: string|undefined }> {
+    const [alt, path] = await Promise.all([
+      this.getResourceValue("values", "alt.json", res),
+      this.getResourcePath("drawables", res)
+    ]);
+    const src = new URL([window.location.href, this.resFolder, path].join("/")).href;
+    return { src, alt };
   }
 
   public async getString(res: string, ...params: any[]): Promise<string | undefined> {
