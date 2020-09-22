@@ -1,7 +1,7 @@
 export type Instantiable<T = any> = {new(...args: any[]): T};
 
-export function betterEval(code: string): any {
-	const data = `"use strict";return (${code})`;
+export function betterEval(code: string, useStrict: boolean = true): any {
+	const data = `${useStrict ? '"use strict";' : ''}return (${code})`;
 	return Function(data)();
 }
 

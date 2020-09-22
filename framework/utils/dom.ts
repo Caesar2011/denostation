@@ -1,6 +1,7 @@
 import {betterEval} from "./misc.ts";
 import {BaseComponent, HTMLDataElement} from "../component.ts";
 import {framework} from "../mod.ts";
+import {BaseDirective} from '../directive.ts';
 
 type ParseFunc<T = any> = (data: any) => Promise<T>|T;
 export type NodeUpgrade = {
@@ -11,41 +12,62 @@ type UpgradedText = Text & NodeUpgrade;
 type UpgradedHTMLElement = HTMLElement & NodeUpgrade;
 export type ComponentProperties = {methods: string[], getter: string[], setter: string[]};
 
-function upgradeText(node: UpgradedText) {
+function upgradeText(node: Text) {
   const interpolateText = interpolate(node.wholeText);
-  node.updateAttributes = async function(data: any) {
+  (node as UpgradedText).updateAttributes = async function(data: any) {
     this.data = await interpolateText(data);
   }
 }
+type InOutput = "input"|"output";
+function addDirectives(directives: { [_ in InOutput]: { [p: string]: BaseDirective[] } }, namePart: string, options: { [_ in InOutput]?: boolean }): boolean {
+  let found = false;
+  if (options.input) {
+    const dirs = framework.directive(namePart, true);
+    if (dirs.length) {
+      found = true;
+      directives.input[namePart] = di
+    }
+  }
+  return found;
+}
 
-function upgradeHTMLElement(node: UpgradedHTMLElement) {
+function upgradeHTMLElement(node: HTMLElement) {
   const inputHtmlArgs: {[_: string]: ParseFunc} = {};
   const inputArgs: {[_: string]: ParseFunc} = {};
   const outputHtmlArgs: {[_: string]: ParseFunc} = {};
   const outputArgs: {[_: string]: ParseFunc} = {};
 
+  const directives: {[_ in InOutput]: {[name: string]: BaseDirective[]}} = {input: {}, output: {}};
+
   const hasComponent = isHTMLDataElement(node);
+  let hasDirective = false;
   const beforeValues = new Map<PropertyKey, any>();
 
-  for (let idx in node.attributes) {
+  for (const idx in node.attributes) {
     if (!node.attributes.hasOwnProperty(idx)) continue;
-    let name = node.attributes[idx].nodeName;
+    const name = node.attributes[idx].nodeName;
     const value = node.attributes[idx].nodeValue || "";
     if (name.startsWith("[(")) { // two-way binding
-      if (hasComponent) {
-        name = name.substring(2, name.length-2);
-        inputArgs[name] = evaluate(value);
-        outputArgs[name] = evaluate(value, true);
+      const namePart = name.substring(2, name.length-2);
+      const nameIsDirective = addDirectives(directives, namePart, {input: true, output: true});
+      hasDirective = hasDirective || nameIsDirective;
+      if (hasComponent || nameIsDirective) {
+        inputArgs[namePart] = evaluate(value);
+        outputArgs[namePart] = evaluate(value, true);
       }
     } else if (name.startsWith("[")) { // input
-      if (hasComponent) {
-        name = name.substring(1, name.length-1);
-        inputArgs[name] = evaluate(value);
+      const namePart = name.substring(1, name.length-1);
+      const nameIsDirective = addDirectives(directives, namePart, {input: true});
+      hasDirective = hasDirective || nameIsDirective;
+      if (hasComponent || nameIsDirective) {
+        inputArgs[namePart] = evaluate(value);
       }
     } else if (name.startsWith("(")) { // output
-      if (hasComponent) {
-        name = name.substring(1, name.length-1);
-        outputArgs[name] = evaluate(value, true);
+      const namePart = name.substring(1, name.length-1);
+      const nameIsDirective = addDirectives(directives, namePart, {output: true});
+      hasDirective = hasDirective || nameIsDirective;
+      if (hasComponent || nameIsDirective) {
+        outputArgs[namePart] = evaluate(value, true);
       }
     } else if (name.startsWith("on")) { // html element events
       outputHtmlArgs[name] = evaluate(value, true);
@@ -53,20 +75,21 @@ function upgradeHTMLElement(node: UpgradedHTMLElement) {
       inputHtmlArgs[name] = interpolate(value);
     }
   }
-  node.updateAttributes = async function (data: any, forceAnyUpdate: boolean) {
+  (node as UpgradedHTMLElement).updateAttributes = async function (data: any, forceAnyUpdate: boolean) {
     for (const key in inputHtmlArgs) {
       this.setAttribute(key, await inputHtmlArgs[key](data));
     }
     for (const key in outputHtmlArgs) {
       (this as any)[key] = outputHtmlArgs[key](data);
     }
-    if (isHTMLDataElement(this)) {
+    if (hasComponent || hasDirective) {
       for (const key in inputArgs) {
         const before = beforeValues.get(key);
         const after = await inputArgs[key](data);
         if (before !== after) {
           beforeValues.set(key, after);
           this.collectInputChange(key, after);
+          //console.error(`The component '${this.tagName}' does not export '${key}' as input.`);
         }
       }
       for (const key in outputArgs) {
@@ -146,12 +169,6 @@ function evaluate(evalText: string, isOutput: boolean = false): ParseFunc {
 }
 
 function evaluatePart(evalText: string, isOutput: boolean = false): ParseFunc {
-  // match all variable names starting with [a-zA-Z_$] (case-sensitive) except of $evt
-  const regex = /(^[ \t]*[a-zA-Z_$])|([^.\sa-zA-Z0-9_$][ \t]*[a-zA-Z_])|([^.\sa-zA-Z0-9_$][ \t]*\$(?!evt))/g;
-  evalText = evalText.replace(regex, (a) => {
-    const pos = a.length-1;
-    return `${a.substring(0, pos)}$refObj.${a.substring(pos)}`;
-  });
   if (isOutput) {
     // if property in output, assign $evt to it ("property.value" -> "property.value = $evt")
     const regexProp = /^[ \t]*[a-zA-Z_$][a-zA-Z0-9_$]*[ \t]*(\.[ \t]*[a-zA-Z_$][a-zA-Z0-9_$]*[ \t]*)*$/g;
@@ -162,7 +179,7 @@ function evaluatePart(evalText: string, isOutput: boolean = false): ParseFunc {
     // make result callable and pass $evt as event data
     evalText = `function($evt) {return ${evalText}}`;
   }
-  const evalFunc = betterEval(`function($refObj) {return ${evalText}}`);
+  const evalFunc = betterEval(`function($refObj) {with ($refObj) {return ${evalText}}}`, false);
 
   return (data) => {
     return evalFunc(data);

@@ -1,6 +1,7 @@
 import {resolve} from './utils/path.ts';
 import {framework, Instantiable, walkTheDOM} from './mod.ts';
 import {ComponentProperties, UpgradedNode, upgradeNode} from "./utils/dom.ts";
+import {IDirective} from './directive.ts';
 
 const symUpdatesBeforeInit = Symbol("updatesBeforeInit");
 
@@ -72,11 +73,11 @@ const constructHandler: ProxyHandler<BaseComponentClass> = {
 
 export const Component: BaseComponentClass = new Proxy(BaseComponent, constructHandler);
 
-export interface HTMLDataElement<T extends BaseComponent = BaseComponent> extends HTMLElement {
+export interface HTMLDataElement<T extends BaseComponent = BaseComponent> extends HTMLElement, IDirective {
 	data: T;
 	updateDOM(forceAnyUpdate?: boolean): void;
 	fireOutput(p: string, value: any): void;
-	collectInputChange(key: string, value: any): void;
+	collectInputChange(key: string, value: any): boolean;
 	collectOutputChange(key: string, value: (evt: any) => void): void;
 	notifyInputChanged(): void;
 }
@@ -153,15 +154,15 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 				this.data.onAttributesChanged(attributeChanges);
 		}
 
-		collectInputChange(key: string, value: any): void {
+		collectInputChange(key: string, value: any): boolean {
 			if (!(base.INPUTS || []).includes(key)) {
-				console.error(`The component '${base.NAME}' does not export '${key}' as input.`);
-				return;
+				return false;
 			}
 			if (this.properties.setter.includes(key) && (this.data as any)[key] !== value) {
 				(this.data as any)[key] = value;
 				this.inputChanges[key] = value;
 			}
+			return true;
 		}
 
 		collectOutputChange(key: string, value: (evt: any) => void): void {

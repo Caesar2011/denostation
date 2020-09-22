@@ -12,7 +12,7 @@ import {iterateEnum} from "../utils/misc.ts";
 
 const RES_FOLDER = "./webpage/res";
 
-let iterator = walkSync(RES_FOLDER, {
+const iterator = walkSync(RES_FOLDER, {
   match: [globToRegExp(join("**", "*.*"), {
     extended: true,
     globstar: true
@@ -40,7 +40,7 @@ await Deno.writeTextFile(join(RES_FOLDER, "list.json"), JSON.stringify(resources
 console.log(JSON.stringify(resources, null, "  "));
 
 function classifyType(next: string): Constraints|undefined {
-  for (let item of iterateEnum(Constraints)) {
+  for (const item of iterateEnum(Constraints)) {
     if (next.match(CONSTRAINT_REGEX[item as Constraints])) return item;
   }
   return undefined;

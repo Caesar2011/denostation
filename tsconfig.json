@@ -9,7 +9,7 @@
     "jsx": "react",
     "jsxFactory": "React.createElement",
     "lib": [
-      "es2015",
+      "es2017",
       "dom",
       "ES2018.Intl",
       "ES2018.AsyncGenerator"

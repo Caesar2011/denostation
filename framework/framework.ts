@@ -3,10 +3,14 @@ import {ComponentClass, ComponentWrapper} from './component.ts';
 import {Pipe, PipeConstructor} from './pipe.ts';
 import {deepFreeze} from './utils/freeze.ts';
 import {isHTMLDataElement} from "./utils/dom.ts";
+import {DirectiveClass} from './directive.ts';
 
 export class Framework {
 
 	private readonly services = new Map<Service<any>, any>();
+	private readonly directivesInput = new Map<string, DirectiveClass[]>();
+	private readonly directivesOutput = new Map<string, DirectiveClass[]>();
+	private readonly directivesAdded = new Set<DirectiveClass>();
 	private readonly _pipes: {[_: string]: PipeConstructor} = {};
 	readonly pipes = deepFreeze(this._pipes);
 
@@ -16,7 +20,26 @@ export class Framework {
 		}, false);
 	}
 
-	directive() {
+	directive(directive: DirectiveClass): void;
+	directive(directive: string, isInput: boolean): DirectiveClass[];
+	directive(directive: DirectiveClass|string, isInput: boolean = false): void|DirectiveClass[] {
+		if (typeof directive === 'string') {
+			return (isInput ? this.directivesInput : this.directivesOutput).get(directive) || [];
+		} else {
+			if (!this.directivesAdded.has(directive)) {
+				this.directivesAdded.add(directive);
+				for (let input of (directive.INPUTS || [])) {
+					const directives = this.directivesInput.get(input) || [];
+					directives.push(directive);
+					this.directivesInput.set(input, directives);
+				}
+				for (let output of (directive.OUTPUTS || [])) {
+					const directives = this.directivesOutput.get(output) || [];
+					directives.push(directive);
+					this.directivesOutput.set(output, directives);
+				}
+			}
+		}
 	}
 
 	pipe(pipe: Pipe) {
