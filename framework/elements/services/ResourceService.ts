@@ -8,7 +8,7 @@ import {
   SCREEN_SIZE, TOUCH_MODE
 } from "../../utils/resource-mapping.ts";
 import {debounce, hasOwnProperty} from "../../utils/misc.ts";
-import {sprintf} from "../../utils/sprintf@1.1.2.ts";
+import {sprintf} from "../../utils/sprintf.ts";
 import {framework} from "../../mod.ts";
 
 export class ResourceService extends CachedEventTarget {

@@ -8,7 +8,12 @@
     "disableSizeLimit": false,
     "jsx": "react",
     "jsxFactory": "React.createElement",
-    "lib": ["es2018", "dom"],
+    "lib": [
+      "es2015",
+      "dom",
+      "ES2018.Intl",
+      "ES2018.AsyncGenerator"
+    ],
     "noFallthroughCasesInSwitch": false,
     "noImplicitAny": true,
     "noImplicitReturns": true,
