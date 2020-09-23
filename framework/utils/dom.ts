@@ -2,10 +2,11 @@ import {betterEval} from "./misc.ts";
 import {BaseComponent, HTMLDataElement} from "../component.ts";
 import {framework} from "../mod.ts";
 import {BaseDirective, DirectiveClass} from '../directive.ts';
+import has = Reflect.has;
 
 type ParseFunc<T = any> = (data: any) => Promise<T>|T;
 export type NodeUpgrade = {
-  updateAttributes(data: any, forceAnyUpdate: boolean): Promise<void>;
+  updateAttributes(data: any, forceAnyUpdate?: boolean): Promise<void>;
 }
 export type UpgradedNode = Node & NodeUpgrade;
 type UpgradedText = Text & NodeUpgrade;
@@ -72,6 +73,10 @@ function upgradeHTMLElement(node: HTMLElement) {
       const namePart = name.substring(1, name.length-1);
       const nameIsDirective = addDirectives(namePart, {directives, directiveCache, node, input: true});
       hasDirective = hasDirective || nameIsDirective;
+      if (namePart === "res") {
+        console.log(namePart, node);
+        console.log(hasDirective, nameIsDirective, hasComponent);
+      }
       if (hasComponent || nameIsDirective) {
         inputArgs[namePart] = evaluate(value);
       }
@@ -99,6 +104,7 @@ function upgradeHTMLElement(node: HTMLElement) {
       for (const key in inputArgs) {
         const before = beforeValues.get(key);
         const after = await inputArgs[key](data);
+        if (key === "res") console.log("update", before, after, node);
         if (before !== after) {
           beforeValues.set(key, after);
           const emitC = hasComponent ? !(this as any as HTMLDataElement).collectInputChange(key, after) : true;

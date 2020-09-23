@@ -2,7 +2,7 @@ import {framework, Service, walkTheDOM} from './mod.ts';
 import {ComponentClass, ComponentWrapper} from './component.ts';
 import {Pipe, PipeConstructor} from './pipe.ts';
 import {deepFreeze} from './utils/freeze.ts';
-import {isHTMLDataElement, upgradeNode} from "./utils/dom.ts";
+import {isHTMLDataElement, UpgradedNode, upgradeNode} from "./utils/dom.ts";
 import {DirectiveClass} from './directive.ts';
 
 export class Framework {
@@ -17,6 +17,11 @@ export class Framework {
 	constructor() {
 		window.addEventListener('DOMContentLoaded', () => {
 			framework.setupNodes(document);
+			walkTheDOM(document, node => {
+				(node as UpgradedNode)
+					.updateAttributes({})
+					.catch(err => console.error("Error on resolving DOM update!", err));
+			});
 		}, false);
 	}
 
@@ -72,11 +77,6 @@ export class Framework {
 	setupNodes(root: Node): void {
 		walkTheDOM(root, node => {
 			upgradeNode(node);
-			if (node instanceof HTMLElement) {
-				if (node.hasAttribute("*if")) {
-
-				}
-			}
 		});
 	}
 }

@@ -94,7 +94,7 @@ export class ResourceService extends CachedEventTarget {
   }
 
   protected async getResources(): Promise<ResourceFile> {
-    return this.fetchFile("list.json", res => res.json());
+    return this.fetchFile(this.getHref("list.json"), res => res.json());
   }
 
   protected initLanguage(): string|undefined {
@@ -170,7 +170,7 @@ export class ResourceService extends CachedEventTarget {
     this.debouncedUpdateDom();
   }
 
-  protected async *fileIterator(dir: ResourceFolder, file: string): AsyncGenerator<any> {
+  protected async *fileIterator(dir: ResourceFolder, file: string): AsyncGenerator<string> {
     const that = this;
     function* findResourcePaths(paths: EntityPaths): Generator<string> {
       if (paths.subPaths && paths.nextConstraint) {
@@ -195,9 +195,13 @@ export class ResourceService extends CachedEventTarget {
     const resources = await this.getResources();
     if (resources) {
       for (const path of findResourcePaths(resources[dir][file])) {
-        yield path;
+        yield this.getHref(path);
       }
     }
+  }
+
+  private getHref(path: string): string {
+    return new URL([window.location.href, this.resFolder, path].join("/")).href;
   }
 
   protected async fetchFile(path: string, consumer: (res: Response) => Promise<any>): Promise<any> {
@@ -210,8 +214,7 @@ export class ResourceService extends CachedEventTarget {
           (this.fetchedResources[path] as Array<any>).push([resolve, reject]);
       } else {
         this.fetchedResources[path] = [[resolve, reject]];
-        const url = new URL([window.location.href, this.resFolder, path].join("/")).href;
-        fetch(url).then(async res => {
+        fetch(path).then(async res => {
           const callbacks = (this.fetchedResources[path] as Array<any>);
           const consumed = await consumer(res);
           this.fetchedResources[path] = {consumed};
@@ -249,11 +252,10 @@ export class ResourceService extends CachedEventTarget {
   }
 
   public async getDrawable(res: string): Promise<{ src: string|undefined, alt: string|undefined }> {
-    const [alt, path] = await Promise.all([
+    const [alt, src] = await Promise.all([
       this.getResourceValue("values", "alt.json", res),
       this.getResourcePath("drawables", res)
     ]);
-    const src = new URL([window.location.href, this.resFolder, path].join("/")).href;
     return { src, alt };
   }
 
@@ -263,6 +265,10 @@ export class ResourceService extends CachedEventTarget {
       return sprintf(value, ...params);
     }
     return undefined;
+  }
+
+  public async getStyles(res: string): Promise<string[]> {
+    return this.getResourcePaths("styles", res);
   }
 
   // "zero" | "one" | "two" | "few" | "many" | "other"
