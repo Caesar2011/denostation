@@ -1,21 +1,26 @@
-import {Pipe, PipeFunc} from "../../pipe.ts";
+import {BasePipe} from "../../pipe.ts";
 import {ResourceService} from "../services/ResourceService.ts";
 import {framework} from "../../mod.ts";
 
-export const ResourcePipe: Pipe<string> = {
-  NAME: "res",
-  pipeConstructor(...args: string[]): PipeFunc<string> {
+export class ResourcePipe extends BasePipe<string> {
+  static NAME = "res";
+
+  private service: ResourceService|undefined;
+
+  protected getResourceService(): ResourceService {
+    if (this.service === undefined) {
+      this.service = framework.service(ResourceService);
+    }
+    return this.service;
+  }
+
+  async transform(value: unknown, ...args: unknown[]): Promise<string> {
     const res = (args.length && args[0] !== "")
-      ? args[0]
+      ? String(args[0])
       : "";
-    let service: ResourceService|undefined = undefined;
-    return async (value: any) => {
-      if (service === undefined) {
-        service = framework.service(ResourceService);
-      }
-      return (value !== undefined && service !== undefined)
-        ? await service.getString(res, value) || ""
-        : "";
-    };
+    const service = this.getResourceService();
+    return (value !== undefined && service !== undefined)
+      ? await service.getString(res, value, args.slice(1)) || ""
+      : "";
   }
 }

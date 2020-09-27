@@ -1,6 +1,6 @@
-import {framework, Service, walkTheDOM} from './mod.ts';
+import {framework, ResourcePipe, Service, walkTheDOM} from './mod.ts';
 import {ComponentClass, ComponentWrapper} from './component.ts';
-import {Pipe, PipeConstructor} from './pipe.ts';
+import {BasePipe, Pipe} from './pipe.ts';
 import {deepFreeze} from './utils/freeze.ts';
 import {isHTMLDataElement, upgradeNode} from "./utils/dom.ts";
 import {DirectiveClass} from './directive.ts';
@@ -11,7 +11,7 @@ export class Framework {
 	private readonly directivesInput = new Map<string, DirectiveClass[]>();
 	private readonly directivesOutput = new Map<string, DirectiveClass[]>();
 	private readonly directivesAdded = new Set<DirectiveClass>();
-	private readonly _pipes: {[_: string]: PipeConstructor} = {};
+	private readonly _pipes: {[_: string]: Pipe} = {};
 	readonly pipes = deepFreeze(this._pipes);
 
 	constructor() {
@@ -43,7 +43,7 @@ export class Framework {
 	}
 
 	pipe(pipe: Pipe) {
-		this._pipes[pipe.NAME] = pipe.pipeConstructor;
+		this._pipes[pipe.NAME] = pipe;
 	}
 
 	component(component: ComponentClass): void {

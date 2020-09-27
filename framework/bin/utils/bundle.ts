@@ -10,7 +10,7 @@ async function addScriptToCode(code: string, script: string, idx: number) {
   return code.substring(0, idx) + "\n" + regenerator + "\n" + code.substring(idx);
 }
 
-export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_MIN: string, IE11_ENABLED: boolean = false, log: boolean = false) {
+export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_MIN?: string, IE11_ENABLED: boolean = false, log: boolean = false) {
   if (log) console.log("Bundling,");
   await exec(`deno bundle --config tsconfig.json ${BUNDLE_IN} ${BUNDLE_OUT}`);
 
@@ -20,18 +20,18 @@ export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_M
     "modules": false,
     "targets": {
       "edge": "80",
-      "firefox": "54",
-      "chrome": "51",
-      "safari": "10"
+      "firefox": "60",
+      "chrome": "67",
+      "safari": "11.1"
     }}]];// */
   if (IE11_ENABLED) {
     presets = [['env', {
       "modules": false,
       "targets": {
         "edge": "17",
-        "firefox": "60",
-        "chrome": "67",
-        "safari": "11.1",
+        "firefox": "54",
+        "chrome": "51",
+        "safari": "10",
         "ie": "11"
       }}]];
     code = await addScriptToCode(code, "../../data/polyfill-eventtarget.js", 0);
@@ -44,9 +44,11 @@ export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_M
   );
   await Deno.writeTextFile(BUNDLE_OUT, code);
 
-  if (log) console.log(`Minify,${IE11_ENABLED ? " (haha joke, still IE11 compatible)" : ""}`);
-  const minified = minify(code).code;
-  await Deno.writeTextFile(BUNDLE_OUT_MIN, minified);
+  if (BUNDLE_OUT_MIN) {
+    if (log) console.log(`Minify,${IE11_ENABLED ? " (haha joke, still IE11 compatible)" : ""}`);
+    const minified = minify(code).code;
+    await Deno.writeTextFile(BUNDLE_OUT_MIN, minified);
+  }
 
   if (log) console.log("Done.");
 }

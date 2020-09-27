@@ -169,8 +169,8 @@ function interpolate(text: string): ParseFunc<string> {
   };
 }
 
-function evaluate(evalText: string, isOutput: boolean = false): ParseFunc {
-  if (isOutput) return evaluatePart(evalText, isOutput);
+function evaluate(evalText: string, isOutput: boolean = false, inPipe: boolean = false): ParseFunc {
+  if (isOutput || inPipe) return evaluatePart(evalText, isOutput);
 
   // extract pipes
   const split: string[] = [];
@@ -226,7 +226,9 @@ function evaluatePipe(evalText: string): ParseFunc {
     console.warn(`The pipe '${split[0]}' is not registered!`);
     return data => data;
   } else {
-    return pipeConstructor(...split.slice(1));
+    const pipe = new pipeConstructor();
+    const args = split.slice(1).map(arg => evaluate(arg, false, true));
+    return async (data: any) => pipe.transform(data, await Promise.all(args.map(arg => arg(data))));
   }
 }
 

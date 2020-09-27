@@ -1,15 +1,15 @@
-import {Pipe, PipeFunc} from "../../pipe.ts";
+import {BasePipe} from "../../pipe.ts";
 
-export const JsonPipe: Pipe<string> = {
-  NAME: "json",
-  pipeConstructor(...args: string[]): PipeFunc<string> {
+export class JsonPipe extends BasePipe<string> {
+  static NAME = "json";
+
+  async transform(value: unknown, ...args: unknown[]): Promise<string> {
+    console.log("jsonpipe", args);
     const spacing = (args.length && args[0] !== "")
-      ? args[0]
+      ? String(args[0])
       : undefined;
-    return async (value: any) => {
-      return (spacing !== undefined)
-        ? JSON.stringify(value, null, spacing)
-        : JSON.stringify(value);
-    };
+    return (spacing !== undefined)
+      ? JSON.stringify(value, null, spacing)
+      : JSON.stringify(value);
   }
 }

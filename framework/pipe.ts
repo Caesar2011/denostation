@@ -1,9 +1,10 @@
-export type PipeFunc<T = any> = ((value: any) => Promise<T>|T);
-export type PipeConstructor<T = any> = (...args: string[]) => PipeFunc<T>;
+import {Instantiable} from "./utils/misc.ts";
 
 export type Pipe<T = any> = {
-	NAME: string,
+	NAME: string
+} & Instantiable<BasePipe<T>>;
 
-	pipeConstructor(...args: string[]): PipeFunc<T>;
+export abstract class BasePipe<T> {
+	abstract transform(value: unknown, ...args: unknown[]): Promise<T>;
 }
 
