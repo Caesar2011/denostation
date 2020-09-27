@@ -1,0 +1,9 @@
+@import "corporate.css";
+:root {
+    --primary: var(--bio-sky-900);
+}
+
+body {
+    background-color: lightgray;
+    color: var(--primary);
+}

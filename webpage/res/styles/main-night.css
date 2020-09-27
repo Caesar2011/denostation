@@ -1,0 +1,7 @@
+:root {
+    --primary: var(--bio-sky-100);
+}
+
+body {
+    background-color: #444;
+}
