@@ -1,7 +1,8 @@
-import {bundle} from "./utils/bundle.ts";
+import {bundleAndMinify} from "./utils/bundle.ts";
 
-await bundle(
+await bundleAndMinify(
   "webpage/bundle.ts",
   "webpage/bundle.js",
-  "webpage/bundle.min.js"
+  "webpage/bundle.min.js",
+  "tsconfig.json"
 );

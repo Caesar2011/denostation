@@ -23,7 +23,7 @@ export class CounterComponent extends Component {
 		this.value++;
 	}
 
-	showValue(value: any) {
+	async showValue(value: any) {
 		return this.resService.getString("counter", value);
 	}
 

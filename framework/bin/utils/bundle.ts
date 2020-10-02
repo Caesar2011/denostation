@@ -1,5 +1,5 @@
 import { exec } from "https://deno.land/x/execute@v1.1.0/mod.ts";
-import { join } from "https://deno.land/std@0.70.0/path/mod.ts";
+import { join } from "https://deno.land/std@0.72.0/path/mod.ts";
 import Babel from "https://dev.jspm.io/@babel/standalone"; // @6.26.0
 import minify from "https://dev.jspm.io/babel-minify";
 
@@ -10,12 +10,16 @@ async function addScriptToCode(code: string, script: string, idx: number) {
   return code.substring(0, idx) + "\n" + regenerator + "\n" + code.substring(idx);
 }
 
-export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_MIN?: string, IE11_ENABLED: boolean = false, log: boolean = false) {
-  if (log) console.log("Bundling,");
-  await exec(`deno bundle --config tsconfig.json ${BUNDLE_IN} ${BUNDLE_OUT}`);
+export function bundle(bundleIn: string, bundleOut: string, tsConfig?: string): Promise<string> {
+  return exec(`deno bundle${tsConfig ? ` --config ${tsConfig}` : " "} ${bundleIn} ${bundleOut}`);
+}
 
-  if (log) console.log(IE11_ENABLED ? "IE11'ify," : "Transform,");
-  let code = await Deno.readTextFile(BUNDLE_OUT);
+export async function bundleAndMinify(bundleIn: string, bundleOut: string, bundleOutMin?: string, tsConfig?: string, ie11Enabled: boolean = false, log: boolean = false) {
+  if (log) console.log("Bundling,");
+  await bundle(bundleIn, bundleOut, tsConfig);
+
+  if (log) console.log(ie11Enabled ? "IE11'ify," : "Transform,");
+  let code = await Deno.readTextFile(bundleOut);
   let presets: any = [['env', {
     "modules": false,
     "targets": {
@@ -24,7 +28,7 @@ export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_M
       "chrome": "67",
       "safari": "11.1"
     }}]];// */
-  if (IE11_ENABLED) {
+  if (ie11Enabled) {
     presets = [['env', {
       "modules": false,
       "targets": {
@@ -36,18 +40,18 @@ export async function bundle(BUNDLE_IN: string, BUNDLE_OUT: string, BUNDLE_OUT_M
       }}]];
     code = await addScriptToCode(code, "../../data/polyfill-eventtarget.js", 0);
   }
-  code = Babel.transform(code, { presets }).code;
+  code = (Babel as any).transform(code, { presets }).code;
   code = await addScriptToCode(
     code,
     "../../data/regeneratorRuntime.js",
     code.indexOf("\"use strict\";") + "\"use strict\";".length
   );
-  await Deno.writeTextFile(BUNDLE_OUT, code);
+  await Deno.writeTextFile(bundleOut, code);
 
-  if (BUNDLE_OUT_MIN) {
-    if (log) console.log(`Minify,${IE11_ENABLED ? " (haha joke, still IE11 compatible)" : ""}`);
-    const minified = minify(code).code;
-    await Deno.writeTextFile(BUNDLE_OUT_MIN, minified);
+  if (bundleOutMin) {
+    if (log) console.log(`Minify,${ie11Enabled ? " (haha joke, still IE11 compatible)" : ""}`);
+    const minified = (minify as any)(code).code;
+    await Deno.writeTextFile(bundleOutMin, minified);
   }
 
   if (log) console.log("Done.");

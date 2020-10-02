@@ -104,7 +104,10 @@ export function ComponentWrapper(base: ComponentClass): Instantiable<HTMLElement
 		}
 
 		private async setup() {
-			const baseUrl = (base.META as { url: string }).url;
+			let baseUrl = (base.META as { url: string }).url;
+			console.log("baseUrl1", baseUrl);
+			baseUrl = baseUrl.substr(baseUrl.indexOf("/", 1)+1);
+			console.log("baseUrl2", baseUrl);
 			const htmlPath = resolve(baseUrl, "../", base.HTML);
 			const res = await fetch(htmlPath);
 			this.root.innerHTML = await res.text();

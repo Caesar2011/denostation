@@ -9,7 +9,7 @@ import {
 } from "../../utils/resource-mapping.ts";
 import {debounce, hasOwnProperty} from "../../utils/misc.ts";
 import {sprintf} from "../../utils/sprintf.ts";
-import {framework} from "../../mod.ts";
+import {framework, resolve} from "../../mod.ts";
 
 export class ResourceService extends CachedEventTarget {
   private constraints: {[key in Constraints]: string|undefined} = {
@@ -201,7 +201,8 @@ export class ResourceService extends CachedEventTarget {
   }
 
   private getHref(path: string): string {
-    return new URL([window.location.href, this.resFolder, path].join("/")).href;
+    console.log("getHref", path, resolve(window.location.origin, this.resFolder, path));
+    return resolve(window.location.origin, this.resFolder, path);
   }
 
   protected async fetchFile(path: string, consumer: (res: Response) => Promise<any>): Promise<any> {
