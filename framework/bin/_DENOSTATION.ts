@@ -3,89 +3,129 @@
 import {stationServe} from "./serve.ts";
 import { join, globToRegExp } from "https://deno.land/std@0.72.0/path/mod.ts";
 import { walkSync } from "https://deno.land/std@0.72.0/fs/walk.ts";
-import {relative, resolve} from "../utils/path.ts";
-import {bundle, bundleAndMinify} from "./utils/bundle.ts";
+import {relative, resolve} from "https://deno.land/std@0.72.0/path/mod.ts";
+import {bundle, bundleAndTransform} from "./utils/bundle.ts";
 import {mapResources} from "./resource.ts";
 
-async function denostationCli(args: string[]): Promise<void> {
-  const config = await loadConfig();
-  const cwd = Deno.cwd();
-  switch (args[0]) {
-    case "serve":
-      await stationServe(Number(args[1] || NaN) || config.port, config.outFolder);
-      break;
-    case "bundle":
-      Deno.chdir(config.rootFolder);
-      await Deno.mkdir(join(cwd, config.outFolder), {recursive: true});
-      await bundleAndMinify(
-        join(cwd, config.rootFolder, "bundle.ts"),
-        join(cwd, config.outFolder, "bundle.js"),
-        join(cwd, config.outFolder, "bundle.min.js"),
-        join(cwd, config.rootFolder, config.tsConfig),
-        false,
-        true
-      );
-      Deno.chdir(cwd);
-      const iterators = [walkSync(config.rootFolder, {
-        match: ["html", "ico", "css"].map(ending => globToRegExp(join("**", `*.${ending}`), {
-          extended: true,
-          globstar: true
-        }))
-      })];
-      iterators.push(walkSync(join(config.rootFolder, "res"), {
-        match: [globToRegExp(join("**", "*.*"), {
-          extended: true,
-          globstar: true
-        })]
-      }));
-      for (const iterator of iterators) {
-        for (const value of iterator) {
-          if (value.isFile && !value.isSymlink) {
-            const newFilepath = join(Deno.cwd(), config.outFolder, relative(config.rootFolder, value.path));
-            await Deno.mkdir(newFilepath.substr(0, newFilepath.length-value.name.length), {recursive: true});
-            await Deno.copyFile(
-              join(Deno.cwd(), value.path),
-              join(newFilepath),
-            );
-          }
+class DenostationCli {
+  private readonly cwd: string = Deno.cwd();
+
+  constructor(private readonly config: Config) { }
+
+  async run(args: string[]) {
+    switch (args[0]) {
+      case "serve":
+        await this.serve(args[1], this.config.outFolder);
+        break;
+      case "compile":
+        await this.compile();
+        break;
+      case "resources":
+        await this.mapResources();
+        break;
+      case "production":
+        await this.compile();
+        await this.mapResources();
+        break;
+      case "debug":
+        await this.debug(args[1]);
+        break;
+    }
+  }
+
+  async serve(port: string|undefined, baseDir: string) {
+    return stationServe(Number(port || NaN) || this.config.port, baseDir);
+  }
+
+  async copyData(srcDir: string, outDir: string) {
+    const iterators = [walkSync(srcDir, {
+      match: ["html", "ico", "css"].map(ending => globToRegExp(join("**", `*.${ending}`), {
+        extended: true,
+        globstar: true
+      }))
+    })];
+    iterators.push(walkSync(join(srcDir, "res"), {
+      match: [globToRegExp(join("**", "*.*"), {
+        extended: true,
+        globstar: true
+      })]
+    }));
+    for (const iterator of iterators) {
+      for (const value of iterator) {
+        if (value.isFile && !value.isSymlink) {
+          const newFilepath = join(Deno.cwd(), outDir, relative(srcDir, value.path));
+          await Deno.mkdir(newFilepath.substr(0, newFilepath.length-value.name.length), {recursive: true});
+          await Deno.copyFile(
+            join(this.cwd, value.path),
+            join(newFilepath),
+          );
         }
       }
-      break;
-    case "resource":
-      await mapResources(join(config.rootFolder, "res"));
-      break;
-    case "production":
-      await denostationCli(["resource"]);
-      await denostationCli(["bundle"]);
-      break;
-    case "debug":
-      let changeCb: (() => void)|undefined;
-      const doBundle = () => bundle(
-        join(cwd, config.rootFolder, "bundle.ts"),
-        join(cwd, config.rootFolder, "bundle.js"),
-        join(cwd, config.rootFolder, config.tsConfig)
-      );
-      await doBundle();
-      (async () => {
-        let timeout: number|undefined;
-        for await (const change of Deno.watchFs(config.rootFolder, {recursive: true})) {
-          const containsTsFile = change.paths.some(path => path.endsWith(".ts"));
-          if (containsTsFile) {
-            if (timeout) {
-              clearTimeout(timeout);
-              timeout = undefined;
-            }
-            timeout = setTimeout(async () => {
-              console.log("Change detected: Compiling...");
-              timeout = undefined;
-              await doBundle();
-              if (changeCb) changeCb();
-            }, 50);
-          }
-        }
-      })().catch(err => {console.error(err); Deno.exit(1)});
-      await stationServe(Number(args[1] || NaN) || config.port, config.rootFolder, cb => changeCb = cb);
-      break;
+    }
+  }
+
+  async compile() {
+    await Deno.mkdir(join(this.cwd, this.config.outFolder), {recursive: true});
+    await bundleAndTransform(
+      join(this.cwd, this.config.rootFolder, "bundle.ts"),
+      join(this.cwd, this.config.outFolder, "bundle.js"),
+      join(this.cwd, this.config.outFolder, "bundle.min.js"),
+      join(this.cwd, this.config.rootFolder, this.config.tsConfig),
+      true
+    );
+    await this.copyData(this.config.rootFolder, this.config.outFolder);
+  }
+
+  async debug(port: string|undefined) {
+    const opts: {changeCb?: (() => void)} = {};
+    const doBundle = () => bundle(
+      join(this.cwd, this.config.rootFolder, "bundle.ts"),
+      join(this.cwd, this.config.rootFolder, "bundle.js"),
+      join(this.cwd, this.config.rootFolder, this.config.tsConfig)
+    );
+    await doBundle();
+    this.changeDetector(doBundle, opts)
+      .catch(err => {console.error(err); Deno.exit(1)});
+    await stationServe(
+      Number(port || NaN) || this.config.port,
+      this.config.rootFolder,
+      cb => opts.changeCb = cb
+    );
+  }
+
+  async changeDetector(doBundle: () => Promise<string>, opts: {changeCb?: () => void}) {
+    let detectors: {
+      timeout?: number|undefined,
+      detector: (change: Deno.FsEvent) => boolean,
+      handler: () => Promise<unknown>
+    }[] = [{
+      detector: change => change.paths.some(path => path.endsWith(".ts")),
+      handler: () => {
+        console.log("Change detected: Compiling files...");
+        return doBundle();
+      }
+    }, {
+      detector: change => change.paths.some(path => path.startsWith(resolve(Deno.cwd(), this.config.rootFolder, "res"))),
+      handler: () => {
+        console.log("Change detected: Compiling resources...");
+        return this.mapResources();
+      }
+    }];
+    for await (const change of Deno.watchFs(this.config.rootFolder, {recursive: true})) {
+      for (const detector of detectors) {
+        if (!detector.detector(change)) continue;
+        if (detector.timeout) clearTimeout(detector.timeout);
+        detector.timeout = setTimeout(async () => {
+          detector.timeout = undefined;
+          await detector.handler();
+          if (opts.changeCb) opts.changeCb();
+        }, 50);
+      }
+    }
+  }
+
+  async mapResources() {
+    await mapResources(join(this.config.rootFolder, "res"));
   }
 }
 
@@ -113,5 +153,6 @@ async function loadConfig(): Promise<Config> {
 }
 
 if (import.meta.main) {
-  await denostationCli(Deno.args);
+  const cli = new DenostationCli(await loadConfig());
+  await cli.run(Deno.args);
 }

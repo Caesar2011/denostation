@@ -1,6 +1,6 @@
-import {bundleAndMinify} from "./utils/bundle.ts";
+import {bundleAndTransform} from "./utils/bundle.ts";
 
-await bundleAndMinify(
+await bundleAndTransform(
   "webpage/bundle.ts",
   "webpage/bundle.js",
   "webpage/bundle.min.js",

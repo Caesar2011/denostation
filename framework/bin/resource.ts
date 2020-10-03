@@ -28,7 +28,7 @@ export async function mapResources(resFolder: string) {
       const path = (match[2] || "").split("-").filter(x => !!x);
       if (path.length === 0) continue;
       path[0] = `${path[0]}.${match[3] || ""}`;
-      addResource(resources[match[1] as ResourceFolder], resFolder, path, value.path);
+      addResource(resources[match[1] as ResourceFolder], resFolder, path, value.path.replaceAll("\\", "/"));
     }
   }
 
